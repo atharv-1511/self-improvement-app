@@ -29,6 +29,13 @@ export function RAGAgent({ dailyData, habits, currentDate }) {
     e.preventDefault();
     if (!query.trim()) return;
 
+    // Check if API key is available
+    const apiKey = process.env.REACT_APP_CLAUDE_API_KEY;
+    if (!apiKey) {
+      setResponse('⚠️ Claude API key not configured. Please set REACT_APP_CLAUDE_API_KEY environment variable.');
+      return;
+    }
+
     setLoading(true);
     try {
       const stats = getHabitStats();
@@ -50,7 +57,7 @@ Provide a concise, actionable response (2-3 sentences max) to help them improve 
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: {
-          'x-api-key': process.env.REACT_APP_CLAUDE_API_KEY || '',
+          'x-api-key': apiKey,
           'anthropic-version': '2023-06-01',
           'content-type': 'application/json',
         },
@@ -62,7 +69,8 @@ Provide a concise, actionable response (2-3 sentences max) to help them improve 
       });
 
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(`API error ${response.status}: ${errorData.error?.message || 'Unknown error'}`);
       }
 
       const data = await response.json();
@@ -70,7 +78,7 @@ Provide a concise, actionable response (2-3 sentences max) to help them improve 
       setResponse(aiResponse);
     } catch (error) {
       console.error('RAG Agent error:', error);
-      setResponse('Sorry, I encountered an error. Please check your API key.');
+      setResponse(`❌ Error: ${error.message || 'Failed to get response from Claude API'}`);
     } finally {
       setLoading(false);
     }
