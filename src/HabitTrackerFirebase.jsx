@@ -164,7 +164,6 @@ function HabitTrackerFirebase() {
     try {
       const config = JSON.parse(configInput);
       localStorage.setItem('firebaseConfig', JSON.stringify(config));
-      setFirebaseConfig(config);
       setShowConfigForm(false);
       setConfigInput('');
       setupFirebase(config);
