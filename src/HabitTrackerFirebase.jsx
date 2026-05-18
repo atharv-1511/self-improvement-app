@@ -138,12 +138,8 @@ function HabitTrackerFirebase() {
       setUser(currentUser);
       console.log('✅ Anonymous user signed in:', currentUser.uid);
 
-      // Generate or get sync device ID (so all devices sync to same location)
-      let syncDeviceId = localStorage.getItem('syncDeviceId');
-      if (!syncDeviceId) {
-        syncDeviceId = 'device-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-        localStorage.setItem('syncDeviceId', syncDeviceId);
-      }
+      // Use a SHARED sync device ID (so all devices sync to same location)
+      const syncDeviceId = 'shared-habits';
       console.log('📱 Sync Device ID:', syncDeviceId);
 
       // Poll for updates every 3 seconds (more reliable than real-time listeners)
@@ -219,10 +215,9 @@ function HabitTrackerFirebase() {
     setSyncStatus('syncing');
     try {
       const newValue = !todayData[habitId];
-      const syncDeviceId = localStorage.getItem('syncDeviceId');
-      const habitRef = doc(db, 'syncDevices', syncDeviceId, 'habits', today);
+      const habitRef = doc(db, 'syncDevices', 'shared-habits', 'habits', today);
 
-      console.log('📝 Writing habit:', { habitId, newValue, today, syncDeviceId });
+      console.log('📝 Writing habit:', { habitId, newValue, today });
 
       await setDoc(
         habitRef,
@@ -241,7 +236,7 @@ function HabitTrackerFirebase() {
       console.error('❌ Error updating habit:', error);
       setSyncStatus('error');
       if (error.code === 'permission-denied') {
-        console.error('🔐 Permission denied! Check Firestore rules for path: syncDevices/{syncDeviceId}/habits/{today}');
+        console.error('🔐 Permission denied! Check Firestore rules for path: syncDevices/shared-habits/habits/{today}');
       }
     }
   };
