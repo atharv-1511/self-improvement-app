@@ -9,7 +9,7 @@ import {
   collection,
   doc,
   setDoc,
-  onSnapshot,
+  getDocs,
 } from 'firebase/firestore';
 
 const HABITS = [
@@ -146,28 +146,30 @@ function HabitTrackerFirebase() {
       }
       console.log('📱 Sync Device ID:', syncDeviceId);
 
-      // Listen for real-time updates using sync device ID
-      const habitsRef = collection(db, 'syncDevices', syncDeviceId, 'habits');
-      const unsubscribe = onSnapshot(
-        habitsRef,
-        (snapshot) => {
-          console.log('📊 Firestore data received:', snapshot.docs.length, 'documents');
+      // Poll for updates every 3 seconds (more reliable than real-time listeners)
+      const pollInterval = setInterval(async () => {
+        try {
+          const habitsRef = collection(db, 'syncDevices', syncDeviceId, 'habits');
+          const snapshot = await getDocs(habitsRef);
+
           const data = {};
           snapshot.forEach((doc) => {
             data[doc.id] = doc.data().completed || {};
           });
           setDailyData(data);
           setSyncStatus('synced');
-          console.log('✅ Sync status: synced');
-        },
-        (error) => {
-          console.error('❌ Firestore listener error:', error);
+          console.log('📊 Firestore data polled:', snapshot.docs.length, 'documents');
+        } catch (error) {
+          console.error('❌ Firestore poll error:', error);
           setSyncStatus('error');
           if (error.code === 'permission-denied') {
             console.error('🔐 Permission issue: Check your Firestore rules!');
           }
         }
-      );
+      }, 3000);
+
+      // Cleanup: clear polling interval on unmount
+      const unsubscribe = () => clearInterval(pollInterval);
 
       // Load dark mode preference
       const savedMode = localStorage.getItem('habitTrackerDarkMode');
