@@ -28,9 +28,9 @@ export function RAGAgent({ dailyData, habits, currentDate }) {
     e.preventDefault();
     if (!query.trim()) return;
 
-    const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
+    const apiKey = process.env.REACT_APP_GROQ_API_KEY;
     if (!apiKey) {
-      setResponse('ERR: GEMINI_API_KEY_NOT_FOUND\nPlease configure the environment variable.');
+      setResponse('ERR: GROQ_API_KEY_NOT_FOUND\nPlease configure the environment variable.');
       return;
     }
 
@@ -52,18 +52,26 @@ QUERY: "${query}"
 
 Provide a highly analytical, objective, and concise response (2-3 sentences). Focus on data trends and direct actionable insight without fluff.`;
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { maxOutputTokens: 512, temperature: 0.2 },
+          model: 'mixtral-8x7b-32768',
+          messages: [
+            { role: 'system', content: 'You are a personal data analyst. Provide concise, objective insights.' },
+            { role: 'user', content: prompt }
+          ],
+          max_tokens: 512,
+          temperature: 0.2,
         }),
       });
 
       if (!res.ok) throw new Error(`API_ERR_${res.status}`);
       const data = await res.json();
-      setResponse(data.candidates[0].content.parts[0].text);
+      setResponse(data.choices[0].message.content);
     } catch (error) {
       setResponse(`ERR: ${error.message || 'API_CONNECTION_FAILED'}`);
     } finally {
