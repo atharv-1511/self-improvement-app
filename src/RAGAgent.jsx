@@ -30,9 +30,9 @@ export function RAGAgent({ dailyData, habits, currentDate }) {
     if (!query.trim()) return;
 
     // Check if API key is available
-    const apiKey = process.env.REACT_APP_OPENAI_API_KEY;
+    const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
     if (!apiKey) {
-      setResponse('⚠️ OpenAI API key not configured. Please set REACT_APP_OPENAI_API_KEY environment variable.');
+      setResponse('⚠️ Gemini API key not configured. Please set REACT_APP_GEMINI_API_KEY environment variable.');
       return;
     }
 
@@ -48,25 +48,31 @@ ${habitsList}
 
 Today's Progress: ${stats.completed}/${stats.totalHabits} habits completed
 
-Past 7 days completion: ${Object.entries(stats.last7Days).map(([date, count]) => `${date}: ${count}/7`).join(', ')}
+Past 7 days completion: ${Object.entries(stats.last7Days).map(([date, count]) => `${date}: ${count}/${stats.totalHabits}`).join(', ')}
 
 User's Question: ${query}
 
 Provide a concise, actionable response (2-3 sentences max) to help them improve their habits.`;
 
-      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: 'You are a personal habit coach. Provide concise, actionable advice.' },
-            { role: 'user', content: prompt }
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt,
+                },
+              ],
+            },
           ],
-          max_tokens: 1024,
+          generationConfig: {
+            maxOutputTokens: 1024,
+            temperature: 0.7,
+          },
         }),
       });
 
@@ -76,11 +82,11 @@ Provide a concise, actionable response (2-3 sentences max) to help them improve 
       }
 
       const data = await response.json();
-      const aiResponse = data.choices[0].message.content;
+      const aiResponse = data.candidates[0].content.parts[0].text;
       setResponse(aiResponse);
     } catch (error) {
       console.error('RAG Agent error:', error);
-      setResponse(`❌ Error: ${error.message || 'Failed to get response from OpenAI API'}`);
+      setResponse(`❌ Error: ${error.message || 'Failed to get response from Gemini API'}`);
     } finally {
       setLoading(false);
     }
