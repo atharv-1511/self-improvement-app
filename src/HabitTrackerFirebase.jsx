@@ -130,8 +130,15 @@ function HabitTrackerFirebase() {
       currentUser = userCred.user;
       setUser(currentUser);
 
-      // Listen for real-time updates
-      const habitsRef = collection(db, 'users', currentUser.uid, 'habits');
+      // Generate or get sync device ID (so all devices sync to same location)
+      let syncDeviceId = localStorage.getItem('syncDeviceId');
+      if (!syncDeviceId) {
+        syncDeviceId = 'device-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+        localStorage.setItem('syncDeviceId', syncDeviceId);
+      }
+
+      // Listen for real-time updates using sync device ID
+      const habitsRef = collection(db, 'syncDevices', syncDeviceId, 'habits');
       const unsubscribe = onSnapshot(habitsRef, async (snapshot) => {
         const data = {};
         snapshot.forEach((doc) => {
@@ -185,7 +192,8 @@ function HabitTrackerFirebase() {
     setSyncStatus('syncing');
     try {
       const newValue = !todayData[habitId];
-      const habitRef = doc(db, 'users', user.uid, 'habits', today);
+      const syncDeviceId = localStorage.getItem('syncDeviceId');
+      const habitRef = doc(db, 'syncDevices', syncDeviceId, 'habits', today);
 
       await setDoc(
         habitRef,
@@ -206,11 +214,15 @@ function HabitTrackerFirebase() {
   const getWeekDays = () => {
     const week = [];
     const current = new Date(currentDate);
-    const first = current.getDate() - current.getDay();
+    // Get Sunday of current week
+    const dayOfWeek = current.getDay();
+    const date = new Date(current);
+    date.setDate(current.getDate() - dayOfWeek); // Go to Sunday
 
     for (let i = 0; i < 7; i++) {
-      const date = new Date(current.getFullYear(), current.getMonth(), first + i);
-      week.push(date);
+      const dayDate = new Date(date);
+      dayDate.setDate(date.getDate() + i);
+      week.push(dayDate);
     }
     return week;
   };
@@ -256,10 +268,11 @@ function HabitTrackerFirebase() {
     try {
       setSyncStatus('syncing');
       const weekDays = getWeekDays();
+      const syncDeviceId = localStorage.getItem('syncDeviceId');
 
       for (const date of weekDays) {
         const key = getDateKey(date);
-        const habitRef = doc(db, 'users', user.uid, 'habits', key);
+        const habitRef = doc(db, 'syncDevices', syncDeviceId, 'habits', key);
         await setDoc(habitRef, { completed: {} }, { merge: true });
       }
 
