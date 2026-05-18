@@ -117,6 +117,13 @@ function HabitTrackerFirebase() {
     };
 
     initFirebase();
+
+    // Cleanup: return unsubscribe function
+    return () => {
+      if (db) {
+        // Cleanup listeners on unmount
+      }
+    };
   }, []);
 
   const setupFirebase = async (config) => {
@@ -129,6 +136,7 @@ function HabitTrackerFirebase() {
       const userCred = await signInAnonymously(auth);
       currentUser = userCred.user;
       setUser(currentUser);
+      console.log('✅ Anonymous user signed in:', currentUser.uid);
 
       // Generate or get sync device ID (so all devices sync to same location)
       let syncDeviceId = localStorage.getItem('syncDeviceId');
@@ -136,17 +144,30 @@ function HabitTrackerFirebase() {
         syncDeviceId = 'device-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
         localStorage.setItem('syncDeviceId', syncDeviceId);
       }
+      console.log('📱 Sync Device ID:', syncDeviceId);
 
       // Listen for real-time updates using sync device ID
       const habitsRef = collection(db, 'syncDevices', syncDeviceId, 'habits');
-      const unsubscribe = onSnapshot(habitsRef, async (snapshot) => {
-        const data = {};
-        snapshot.forEach((doc) => {
-          data[doc.id] = doc.data().completed || {};
-        });
-        setDailyData(data);
-        setSyncStatus('synced');
-      });
+      const unsubscribe = onSnapshot(
+        habitsRef,
+        (snapshot) => {
+          console.log('📊 Firestore data received:', snapshot.docs.length, 'documents');
+          const data = {};
+          snapshot.forEach((doc) => {
+            data[doc.id] = doc.data().completed || {};
+          });
+          setDailyData(data);
+          setSyncStatus('synced');
+          console.log('✅ Sync status: synced');
+        },
+        (error) => {
+          console.error('❌ Firestore listener error:', error);
+          setSyncStatus('error');
+          if (error.code === 'permission-denied') {
+            console.error('🔐 Permission issue: Check your Firestore rules!');
+          }
+        }
+      );
 
       // Load dark mode preference
       const savedMode = localStorage.getItem('habitTrackerDarkMode');
@@ -162,6 +183,7 @@ function HabitTrackerFirebase() {
       return unsubscribe;
     } catch (error) {
       console.error('Setup error:', error);
+      setSyncStatus('error');
       setLoading(false);
     }
   };
@@ -187,13 +209,18 @@ function HabitTrackerFirebase() {
   const todayData = dailyData[today] || {};
 
   const toggleHabit = async (habitId) => {
-    if (!db || !user) return;
+    if (!db || !user) {
+      console.warn('❌ Cannot toggle: db or user not ready');
+      return;
+    }
 
     setSyncStatus('syncing');
     try {
       const newValue = !todayData[habitId];
       const syncDeviceId = localStorage.getItem('syncDeviceId');
       const habitRef = doc(db, 'syncDevices', syncDeviceId, 'habits', today);
+
+      console.log('📝 Writing habit:', { habitId, newValue, today, syncDeviceId });
 
       await setDoc(
         habitRef,
@@ -205,9 +232,15 @@ function HabitTrackerFirebase() {
         },
         { merge: true }
       );
+
+      console.log('✅ Habit written successfully');
+      setSyncStatus('synced');
     } catch (error) {
-      console.error('Error updating habit:', error);
+      console.error('❌ Error updating habit:', error);
       setSyncStatus('error');
+      if (error.code === 'permission-denied') {
+        console.error('🔐 Permission denied! Check Firestore rules for path: syncDevices/{syncDeviceId}/habits/{today}');
+      }
     }
   };
 
