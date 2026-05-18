@@ -1,105 +1,35 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap');
 
 :root {
-  --font-heading: 'Outfit', sans-serif;
+  --font-heading: 'Inter', sans-serif;
   --font-body: 'Inter', sans-serif;
-
-  /* Light Theme Colors */
-  --bg-primary: #f0f2f5;
-  --bg-secondary: #ffffff;
-  --text-primary: #1f2937;
-  --text-secondary: #6b7280;
-  --border-color: rgba(229, 231, 235, 0.5);
-  
-  --glass-bg: rgba(255, 255, 255, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.2);
-  --glass-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
-  --hover-bg: #f9fafb;
+  --font-mono: 'Space Mono', monospace;
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #141414;
+  --text-primary: #ededed;
+  --text-secondary: #888888;
+  --border-color: #333333;
+  --accent-color: #ffffff;
+  --panel-border: 1px solid var(--border-color);
+  --hover-bg: #1f1f1f;
+  --radius: 2px;
 }
 
-[data-theme='dark'] {
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --border-color: rgba(51, 65, 85, 0.5);
-
-  --glass-bg: rgba(30, 41, 59, 0.7);
-  --glass-border: rgba(255, 255, 255, 0.05);
-  --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
-  --hover-bg: #334155;
-}
-
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-html, body {
-  width: 100%;
-  min-height: 100%;
-}
-
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; min-height: 100%; }
 body {
   font-family: var(--font-body);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  transition: background-color 0.3s ease, color 0.3s ease;
-  background-image: 
-    radial-gradient(at 0% 0%, hsla(253,16%,7%,1) 0, transparent 50%), 
-    radial-gradient(at 50% 0%, hsla(225,39%,30%,0.1) 0, transparent 50%), 
-    radial-gradient(at 100% 0%, hsla(339,49%,30%,0.1) 0, transparent 50%);
-  background-attachment: fixed;
+  line-height: 1.6;
 }
-
-[data-theme='light'] body {
-  background-image: 
-    radial-gradient(at 0% 0%, hsla(253,16%,97%,1) 0, transparent 50%), 
-    radial-gradient(at 50% 0%, hsla(225,39%,80%,0.3) 0, transparent 50%), 
-    radial-gradient(at 100% 0%, hsla(339,49%,80%,0.3) 0, transparent 50%);
-}
-
-#root {
-  width: 100%;
-  min-height: 100vh;
-}
-
-h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-heading);
-  letter-spacing: -0.02em;
-}
-
-/* Glassmorphism Utilities */
-.glass-panel {
-  background: var(--glass-bg);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--glass-border);
-  box-shadow: var(--glass-shadow);
-  border-radius: 16px;
-}
-
-.glass-button {
-  background: var(--glass-bg);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
-  border: 1px solid var(--border-color);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  transition: all 0.2s ease-in-out;
-}
-
-.glass-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-}
-
-.gradient-text {
-  background-clip: text;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-image: linear-gradient(90deg, #10b981, #3b82f6);
-}
-
+#root { width: 100%; min-height: 100vh; }
+h1, h2, h3, h4, h5, h6 { font-family: var(--font-heading); font-weight: 600; color: var(--text-primary); }
+.qs-panel { background: var(--bg-secondary); border: var(--panel-border); border-radius: var(--radius); }
+.qs-button { background: var(--bg-primary); color: var(--text-primary); border: var(--panel-border); border-radius: var(--radius); font-family: var(--font-mono); font-size: 13px; text-transform: uppercase; cursor: pointer; transition: all 0.15s; }
+.qs-button:hover { background: var(--hover-bg); border-color: var(--text-primary); }
+.qs-button.primary { background: var(--text-primary); color: var(--bg-primary); border-color: var(--text-primary); }
+.qs-button.primary:hover { background: var(--text-secondary); }
+.qs-button.danger { border-color: #ef4444; color: #ef4444; }
+.qs-button.danger:hover { background: #ef4444; color: #fff; }
+.mono-text { font-family: var(--font-mono); }
