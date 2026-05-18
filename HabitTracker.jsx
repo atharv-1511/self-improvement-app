@@ -1,0 +1,517 @@
+import React, { useState, useEffect, useReducer } from 'react';
+
+const HABITS = [
+  {
+    id: 1,
+    title: 'Protein at every meal',
+    description: 'Breakfast + lunch + evening + night',
+    category: 'Nutrition',
+    color: '#10b981',
+  },
+  {
+    id: 2,
+    title: 'Phone-free hour',
+    description: '1 hour without phone touching',
+    category: 'Phone',
+    color: '#3b82f6',
+  },
+  {
+    id: 3,
+    title: 'One conversation',
+    description: '10 min talk with parent (real, no phone)',
+    category: 'Communication',
+    color: '#a855f7',
+  },
+  {
+    id: 4,
+    title: 'Hair routine',
+    description: 'Oil massage or leave-in conditioner',
+    category: 'Health',
+    color: '#f59e0b',
+  },
+  {
+    id: 5,
+    title: 'No random snacking',
+    description: 'Only planned meals, no biscuits/coffee',
+    category: 'Nutrition',
+    color: '#10b981',
+  },
+  {
+    id: 6,
+    title: 'Eye contact practice',
+    description: '5-7 sec windows with someone',
+    category: 'Communication',
+    color: '#a855f7',
+  },
+  {
+    id: 7,
+    title: 'Bed by 11 PM',
+    description: 'Lights off, phone away',
+    category: 'Sleep',
+    color: '#14b8a6',
+  },
+];
+
+const MOTIVATION_QUOTES = [
+  'Every small step counts. Keep going!',
+  'Progress over perfection. You are doing great!',
+  'Today is a fresh start. Make it count!',
+  'Consistency is the key to success.',
+  'You are stronger than your excuses.',
+  'Small habits, big results.',
+  'One day at a time, one habit at a time.',
+  'Your future self will thank you.',
+  'Discipline is choosing what you want most over what you want now.',
+  'Build the life you want, one habit at a time.',
+];
+
+function HabitTracker() {
+  const [darkMode, setDarkMode] = useState(false);
+  const [habits, setHabits] = useState(HABITS);
+  const [dailyData, setDailyData] = useState({});
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [quote, setQuote] = useState(MOTIVATION_QUOTES[0]);
+
+  // Load data from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('habitTrackerData');
+    if (saved) {
+      try {
+        setDailyData(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to load data:', e);
+      }
+    }
+
+    const savedMode = localStorage.getItem('habitTrackerDarkMode');
+    if (savedMode) setDarkMode(JSON.parse(savedMode));
+
+    // Set random quote
+    setQuote(MOTIVATION_QUOTES[Math.floor(Math.random() * MOTIVATION_QUOTES.length)]);
+  }, []);
+
+  // Save data to localStorage
+  useEffect(() => {
+    localStorage.setItem('habitTrackerData', JSON.stringify(dailyData));
+  }, [dailyData]);
+
+  useEffect(() => {
+    localStorage.setItem('habitTrackerDarkMode', JSON.stringify(darkMode));
+  }, [darkMode]);
+
+  const getDateKey = (date) => {
+    return date.toISOString().split('T')[0];
+  };
+
+  const today = getDateKey(currentDate);
+  const todayData = dailyData[today] || {};
+
+  const toggleHabit = (habitId) => {
+    setDailyData({
+      ...dailyData,
+      [today]: {
+        ...todayData,
+        [habitId]: !todayData[habitId],
+      },
+    });
+  };
+
+  const getWeekDays = () => {
+    const week = [];
+    const current = new Date(currentDate);
+    const first = current.getDate() - current.getDay();
+
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(current.getFullYear(), current.getMonth(), first + i);
+      week.push(date);
+    }
+    return week;
+  };
+
+  const getCompletionForDay = (date) => {
+    const key = getDateKey(date);
+    const dayData = dailyData[key] || {};
+    const completed = Object.values(dayData).filter(Boolean).length;
+    return { completed, total: habits.length };
+  };
+
+  const getWeekStats = () => {
+    const weekDays = getWeekDays();
+    let totalCompleted = 0;
+    let perfectDays = 0;
+    let currentStreak = 0;
+    let maxStreak = 0;
+
+    for (let i = weekDays.length - 1; i >= 0; i--) {
+      const { completed, total } = getCompletionForDay(weekDays[i]);
+      totalCompleted += completed;
+
+      if (completed === total) {
+        perfectDays++;
+        currentStreak++;
+        maxStreak = Math.max(maxStreak, currentStreak);
+      } else if (completed >= 5) {
+        currentStreak = 0;
+      } else {
+        currentStreak = 0;
+      }
+    }
+
+    return {
+      totalCompleted,
+      perfectDays,
+      weekStreak: maxStreak,
+      weekPercentage: Math.round((totalCompleted / (habits.length * 7)) * 100),
+    };
+  };
+
+  const resetWeek = () => {
+    setDailyData({});
+    setShowResetConfirm(false);
+  };
+
+  const exportData = () => {
+    const weekDays = getWeekDays();
+    const stats = getWeekStats();
+    let content = `HABIT TRACKER - WEEKLY REPORT\n`;
+    content += `Week of ${weekDays[0].toDateString()} to ${weekDays[6].toDateString()}\n\n`;
+    content += `WEEKLY STATS\n`;
+    content += `============\n`;
+    content += `Total Habits Completed: ${stats.totalCompleted}/${habits.length * 7}\n`;
+    content += `Perfect Days (7/7): ${stats.perfectDays}\n`;
+    content += `Weekly Streak: ${stats.weekStreak} days\n`;
+    content += `Completion Rate: ${stats.weekPercentage}%\n\n`;
+
+    content += `DAILY BREAKDOWN\n`;
+    content += `===============\n`;
+
+    weekDays.forEach((date) => {
+      const { completed, total } = getCompletionForDay(date);
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+      content += `\n${dayName}: ${completed}/${total}\n`;
+
+      habits.forEach((habit) => {
+        const key = getDateKey(date);
+        const dayData = dailyData[key] || {};
+        const status = dayData[habit.id] ? '✓' : '✗';
+        content += `  ${status} ${habit.title}\n`;
+      });
+    });
+
+    const element = document.createElement('a');
+    element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(content));
+    element.setAttribute('download', `habit-tracker-${today}.txt`);
+    element.style.display = 'none';
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  const weekDays = getWeekDays();
+  const stats = getWeekStats();
+
+  const theme = {
+    bg: darkMode ? '#1a1a1a' : '#ffffff',
+    text: darkMode ? '#ffffff' : '#000000',
+    border: darkMode ? '#333333' : '#e5e7eb',
+    cardBg: darkMode ? '#2a2a2a' : '#f9fafb',
+    hover: darkMode ? '#3a3a3a' : '#f3f4f6',
+  };
+
+  const getDayColor = (completed, total) => {
+    if (completed === total) return '#10b981';
+    if (completed >= 5) return '#fbbf24';
+    return '#9ca3af';
+  };
+
+  return (
+    <div style={{ backgroundColor: theme.bg, color: theme.text, minHeight: '100vh', padding: '20px' }}>
+      <style>{`
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        body {
+          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          background-color: ${theme.bg};
+          color: ${theme.text};
+        }
+        input[type="checkbox"] {
+          width: 20px;
+          height: 20px;
+          cursor: pointer;
+          accent-color: #10b981;
+        }
+        button {
+          border: none;
+          padding: 10px 16px;
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+          font-weight: 600;
+          transition: all 0.2s;
+        }
+        button:hover {
+          opacity: 0.9;
+          transform: translateY(-1px);
+        }
+        .primary-btn {
+          background-color: #10b981;
+          color: white;
+        }
+        .danger-btn {
+          background-color: #ef4444;
+          color: white;
+        }
+        .secondary-btn {
+          background-color: ${theme.cardBg};
+          color: ${theme.text};
+          border: 1px solid ${theme.border};
+        }
+      `}</style>
+
+      <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '30px' }}>
+          <div>
+            <h1 style={{ fontSize: '32px', fontWeight: 'bold', marginBottom: '8px' }}>Habit Tracker</h1>
+            <p style={{ fontSize: '16px', color: darkMode ? '#999' : '#666', fontStyle: 'italic' }}>{quote}</p>
+          </div>
+          <button
+            onClick={() => setDarkMode(!darkMode)}
+            style={{ background: theme.cardBg, border: `1px solid ${theme.border}` }}
+            title={darkMode ? 'Light mode' : 'Dark mode'}
+          >
+            {darkMode ? '☀️' : '🌙'}
+          </button>
+        </div>
+
+        {/* Current Date */}
+        <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '24px' }}>
+          Today: {currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}
+        </div>
+
+        {/* Stats Grid */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '16px',
+            marginBottom: '30px',
+          }}
+        >
+          {[
+            { label: 'Completed This Week', value: `${stats.totalCompleted}/${habits.length * 7}` },
+            { label: 'Perfect Days', value: stats.perfectDays },
+            { label: 'Best Streak', value: `${stats.weekStreak} days` },
+            { label: 'Completion Rate', value: `${stats.weekPercentage}%` },
+          ].map((stat, idx) => (
+            <div key={idx} style={{ backgroundColor: theme.cardBg, padding: '16px', borderRadius: '8px', border: `1px solid ${theme.border}` }}>
+              <div style={{ fontSize: '12px', color: darkMode ? '#999' : '#666', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                {stat.label}
+              </div>
+              <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#10b981' }}>{stat.value}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Daily Habits */}
+        <div style={{ marginBottom: '30px' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>Today's Habits</h2>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+              gap: '12px',
+            }}
+          >
+            {habits.map((habit) => (
+              <div
+                key={habit.id}
+                style={{
+                  backgroundColor: theme.cardBg,
+                  border: `2px solid ${todayData[habit.id] ? habit.color : theme.border}`,
+                  borderRadius: '8px',
+                  padding: '16px',
+                  transition: 'all 0.2s',
+                }}
+                onClick={() => toggleHabit(habit.id)}
+              >
+                <div style={{ display: 'flex', alignItems: 'flex-start', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={todayData[habit.id] || false}
+                    onChange={() => toggleHabit(habit.id)}
+                    style={{ marginRight: '12px', marginTop: '2px', flexShrink: 0 }}
+                  />
+                  <div style={{ flex: 1 }}>
+                    <div
+                      style={{
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        textDecoration: todayData[habit.id] ? 'line-through' : 'none',
+                        color: todayData[habit.id] ? darkMode ? '#666' : '#999' : theme.text,
+                        marginBottom: '4px',
+                      }}
+                    >
+                      {habit.title}
+                    </div>
+                    <div style={{ fontSize: '13px', color: darkMode ? '#999' : '#666', marginBottom: '8px' }}>
+                      {habit.description}
+                    </div>
+                    <div
+                      style={{
+                        display: 'inline-block',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        padding: '4px 8px',
+                        backgroundColor: theme.hover,
+                        borderRadius: '4px',
+                        color: darkMode ? '#999' : '#666',
+                      }}
+                    >
+                      {habit.category}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Weekly View */}
+        <div style={{ marginBottom: '30px' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '16px' }}>Weekly Overview</h2>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))',
+              gap: '12px',
+            }}
+          >
+            {weekDays.map((date) => {
+              const { completed, total } = getCompletionForDay(date);
+              const dayColor = getDayColor(completed, total);
+              const isToday = getDateKey(date) === today;
+
+              return (
+                <div
+                  key={getDateKey(date)}
+                  onClick={() => setCurrentDate(date)}
+                  style={{
+                    backgroundColor: isToday ? theme.hover : theme.cardBg,
+                    border: isToday ? `2px solid ${dayColor}` : `1px solid ${theme.border}`,
+                    borderRadius: '8px',
+                    padding: '16px',
+                    textAlign: 'center',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s',
+                    transform: isToday ? 'scale(1.05)' : 'scale(1)',
+                  }}
+                >
+                  <div style={{ fontSize: '12px', fontWeight: '600', color: darkMode ? '#999' : '#666', marginBottom: '8px' }}>
+                    {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                  </div>
+                  <div style={{ fontSize: '11px', color: darkMode ? '#999' : '#666', marginBottom: '12px' }}>
+                    {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: '20px',
+                      fontWeight: 'bold',
+                      color: dayColor,
+                      marginBottom: '4px',
+                    }}
+                  >
+                    {completed}/{total}
+                  </div>
+                  <div
+                    style={{
+                      width: '100%',
+                      height: '4px',
+                      backgroundColor: theme.hover,
+                      borderRadius: '2px',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: '100%',
+                        width: `${(completed / total) * 100}%`,
+                        backgroundColor: dayColor,
+                        transition: 'width 0.2s',
+                      }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div
+          style={{
+            display: 'flex',
+            gap: '12px',
+            flexWrap: 'wrap',
+            marginBottom: '20px',
+          }}
+        >
+          <button onClick={exportData} className="primary-btn">
+            📥 Export Data
+          </button>
+          <button onClick={() => setShowResetConfirm(true)} className="danger-btn">
+            🔄 Reset Week
+          </button>
+        </div>
+
+        {/* Reset Confirmation */}
+        {showResetConfirm && (
+          <div
+            style={{
+              position: 'fixed',
+              top: '0',
+              left: '0',
+              right: '0',
+              bottom: '0',
+              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: '1000',
+            }}
+          >
+            <div
+              style={{
+                backgroundColor: theme.bg,
+                padding: '30px',
+                borderRadius: '12px',
+                border: `1px solid ${theme.border}`,
+                maxWidth: '400px',
+                width: '90%',
+              }}
+            >
+              <h3 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '12px' }}>Reset This Week?</h3>
+              <p style={{ marginBottom: '20px', color: darkMode ? '#999' : '#666' }}>
+                This will clear all habit data for this week. This action cannot be undone.
+              </p>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button onClick={resetWeek} className="danger-btn" style={{ flex: 1 }}>
+                  Yes, Reset
+                </button>
+                <button onClick={() => setShowResetConfirm(false)} className="secondary-btn" style={{ flex: 1 }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default HabitTracker;
