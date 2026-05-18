@@ -69,10 +69,20 @@ Provide a highly analytical, objective, and concise response (2-3 sentences). Fo
         }),
       });
 
-      if (!res.ok) throw new Error(`API_ERR_${res.status}`);
       const data = await res.json();
-      setResponse(data.choices[0].message.content);
+      console.log('Groq API Response:', data);
+
+      if (!res.ok) {
+        throw new Error(`API_ERR_${res.status}: ${data.error?.message || JSON.stringify(data)}`);
+      }
+
+      if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+        setResponse(data.choices[0].message.content);
+      } else {
+        throw new Error(`INVALID_RESPONSE_FORMAT: ${JSON.stringify(data)}`);
+      }
     } catch (error) {
+      console.error('Groq API Error:', error);
       setResponse(`ERR: ${error.message || 'API_CONNECTION_FAILED'}`);
     } finally {
       setLoading(false);
