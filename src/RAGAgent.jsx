@@ -30,9 +30,9 @@ export function RAGAgent({ dailyData, habits, currentDate }) {
     if (!query.trim()) return;
 
     // Check if API key is available
-    const apiKey = process.env.REACT_APP_CLAUDE_API_KEY;
+    const apiKey = process.env.REACT_APP_OPENAI_API_KEY;
     if (!apiKey) {
-      setResponse('⚠️ Claude API key not configured. Please set REACT_APP_CLAUDE_API_KEY environment variable.');
+      setResponse('⚠️ OpenAI API key not configured. Please set REACT_APP_OPENAI_API_KEY environment variable.');
       return;
     }
 
@@ -54,17 +54,19 @@ User's Question: ${query}
 
 Provide a concise, actionable response (2-3 sentences max) to help them improve their habits.`;
 
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'content-type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'claude-3-5-sonnet-20241022',
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: 'You are a personal habit coach. Provide concise, actionable advice.' },
+            { role: 'user', content: prompt }
+          ],
           max_tokens: 1024,
-          messages: [{ role: 'user', content: prompt }],
         }),
       });
 
@@ -74,11 +76,11 @@ Provide a concise, actionable response (2-3 sentences max) to help them improve 
       }
 
       const data = await response.json();
-      const aiResponse = data.content[0].text;
+      const aiResponse = data.choices[0].message.content;
       setResponse(aiResponse);
     } catch (error) {
       console.error('RAG Agent error:', error);
-      setResponse(`❌ Error: ${error.message || 'Failed to get response from Claude API'}`);
+      setResponse(`❌ Error: ${error.message || 'Failed to get response from OpenAI API'}`);
     } finally {
       setLoading(false);
     }
