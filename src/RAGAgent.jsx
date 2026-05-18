@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 
+// Using Google Gemini API for habit coaching
 export function RAGAgent({ dailyData, habits, currentDate }) {
   const [query, setQuery] = useState('');
   const [response, setResponse] = useState('');
