@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 
-// Using Google Gemini API for habit coaching
 export function RAGAgent({ dailyData, habits, currentDate }) {
   const [query, setQuery] = useState('');
   const [response, setResponse] = useState('');
@@ -12,7 +11,6 @@ export function RAGAgent({ dailyData, habits, currentDate }) {
     const todayData = dailyData[today] || {};
     const completed = Object.values(todayData).filter(Boolean).length;
 
-    // Get stats for past 7 days
     const last7Days = {};
     for (let i = 0; i < 7; i++) {
       const date = new Date(currentDate);
@@ -30,10 +28,9 @@ export function RAGAgent({ dailyData, habits, currentDate }) {
     e.preventDefault();
     if (!query.trim()) return;
 
-    // Check if API key is available
     const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
     if (!apiKey) {
-      setResponse('⚠️ Gemini API key not configured. Please set REACT_APP_GEMINI_API_KEY environment variable.');
+      setResponse('Gemini API key not configured. Please set REACT_APP_GEMINI_API_KEY environment variable.');
       return;
     }
 
@@ -87,39 +84,45 @@ Provide a concise, actionable response (2-3 sentences max) to help them improve 
       setResponse(aiResponse);
     } catch (error) {
       console.error('RAG Agent error:', error);
-      setResponse(`❌ Error: ${error.message || 'Failed to get response from Gemini API'}`);
+      setResponse(`Error: ${error.message || 'Failed to get response from Gemini API'}`);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={{ marginTop: '20px' }}>
+    <div style={{ marginTop: '32px' }}>
       <button
         onClick={() => setIsOpen(!isOpen)}
+        className="glass-button"
         style={{
           width: '100%',
-          padding: '12px',
+          padding: '16px',
           backgroundColor: '#8b5cf6',
           color: 'white',
           border: 'none',
-          borderRadius: '8px',
+          borderRadius: '16px',
           cursor: 'pointer',
           fontSize: '16px',
           fontWeight: '600',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          gap: '8px'
         }}
       >
-        🤖 Ask AI Coach {isOpen ? '▼' : '▶'}
+        <span>Ask AI Coach</span>
+        <span>{isOpen ? 'Close' : 'Open'}</span>
       </button>
 
       {isOpen && (
         <div
+          className="glass-panel"
           style={{
-            marginTop: '12px',
-            padding: '16px',
-            backgroundColor: '#f5f3ff',
-            borderRadius: '8px',
-            border: '2px solid #8b5cf6',
+            marginTop: '16px',
+            padding: '24px',
+            backgroundColor: 'var(--bg-secondary)',
+            border: '1px solid #8b5cf6',
           }}
         >
           <form onSubmit={searchHabits}>
@@ -130,43 +133,48 @@ Provide a concise, actionable response (2-3 sentences max) to help them improve 
               placeholder="Ask me about your habits..."
               style={{
                 width: '100%',
-                padding: '10px',
-                borderRadius: '6px',
-                border: '1px solid #d8b4fe',
-                fontSize: '14px',
+                padding: '14px',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--bg-primary)',
+                color: 'var(--text-primary)',
+                fontSize: '15px',
                 boxSizing: 'border-box',
+                outline: 'none',
               }}
             />
             <button
               type="submit"
               disabled={loading}
               style={{
-                marginTop: '8px',
+                marginTop: '12px',
                 width: '100%',
-                padding: '10px',
-                backgroundColor: loading ? '#ccc' : '#8b5cf6',
-                color: 'white',
+                padding: '14px',
+                backgroundColor: loading ? 'var(--border-color)' : '#8b5cf6',
+                color: loading ? 'var(--text-secondary)' : 'white',
                 border: 'none',
-                borderRadius: '6px',
+                borderRadius: '12px',
                 cursor: loading ? 'not-allowed' : 'pointer',
-                fontSize: '14px',
+                fontSize: '15px',
+                fontWeight: '600',
+                transition: 'all 0.2s'
               }}
             >
-              {loading ? '⏳ Thinking...' : '💭 Get Advice'}
+              {loading ? 'Thinking...' : 'Get Advice'}
             </button>
           </form>
 
           {response && (
             <div
               style={{
-                marginTop: '12px',
-                padding: '12px',
-                backgroundColor: 'white',
-                borderRadius: '6px',
-                border: '1px solid #e9d5ff',
+                marginTop: '20px',
+                padding: '20px',
+                backgroundColor: 'var(--bg-primary)',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)',
               }}
             >
-              <p style={{ margin: 0, fontSize: '14px', lineHeight: '1.5' }}>
+              <p style={{ margin: 0, fontSize: '15px', lineHeight: '1.6', color: 'var(--text-primary)' }}>
                 {response}
               </p>
             </div>

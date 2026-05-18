@@ -3,14 +3,12 @@ import { initializeApp } from 'firebase/app';
 import {
   getAuth,
   signInAnonymously,
-  onAuthStateChanged,
 } from 'firebase/auth';
 import {
   getFirestore,
   collection,
   doc,
   setDoc,
-  getDoc,
   onSnapshot,
 } from 'firebase/firestore';
 
@@ -67,9 +65,9 @@ const HABITS = [
 ];
 
 const MOTIVATION_QUOTES = [
-  'Every small step counts. Keep going!',
-  'Progress over perfection. You are doing great!',
-  'Today is a fresh start. Make it count!',
+  'Every small step counts. Keep going.',
+  'Progress over perfection. You are doing great.',
+  'Today is a fresh start. Make it count.',
   'Consistency is the key to success.',
   'You are stronger than your excuses.',
   'Small habits, big results.',
@@ -97,15 +95,12 @@ function HabitTrackerFirebase() {
   const [configInput, setConfigInput] = useState('');
   const [syncStatus, setSyncStatus] = useState('syncing');
 
-  // Initialize Firebase
   useEffect(() => {
     const initFirebase = async () => {
       try {
-        // Try to get saved config from localStorage
         let config = localStorage.getItem('firebaseConfig');
 
         if (!config) {
-          // If no config, show setup form
           setShowConfigForm(true);
           setLoading(false);
           return;
@@ -128,12 +123,10 @@ function HabitTrackerFirebase() {
       auth = getAuth(app);
       db = getFirestore(app);
 
-      // Sign in anonymously
       const userCred = await signInAnonymously(auth);
       currentUser = userCred.user;
       setUser(currentUser);
 
-      // Listen for real-time updates
       const habitsRef = collection(db, 'users', currentUser.uid, 'habits');
       const unsubscribe = onSnapshot(habitsRef, async (snapshot) => {
         const data = {};
@@ -144,11 +137,9 @@ function HabitTrackerFirebase() {
         setSyncStatus('synced');
       });
 
-      // Load dark mode preference
       const savedMode = localStorage.getItem('habitTrackerDarkMode');
       if (savedMode) setDarkMode(JSON.parse(savedMode));
 
-      // Set random quote
       setQuote(
         MOTIVATION_QUOTES[Math.floor(Math.random() * MOTIVATION_QUOTES.length)]
       );
@@ -278,17 +269,17 @@ function HabitTrackerFirebase() {
   const exportData = () => {
     const weekDays = getWeekDays();
     const stats = getWeekStats();
-    let content = `HABIT TRACKER - WEEKLY REPORT\n`;
-    content += `Week of ${weekDays[0].toDateString()} to ${weekDays[6].toDateString()}\n\n`;
-    content += `WEEKLY STATS\n`;
-    content += `============\n`;
-    content += `Total Habits Completed: ${stats.totalCompleted}/${habits.length * 7}\n`;
-    content += `Perfect Days (7/7): ${stats.perfectDays}\n`;
-    content += `Weekly Streak: ${stats.weekStreak} days\n`;
-    content += `Completion Rate: ${stats.weekPercentage}%\n\n`;
+    let content = \`HABIT TRACKER - WEEKLY REPORT\n\`;
+    content += \`Week of \${weekDays[0].toDateString()} to \${weekDays[6].toDateString()}\n\n\`;
+    content += \`WEEKLY STATS\n\`;
+    content += \`============\n\`;
+    content += \`Total Habits Completed: \${stats.totalCompleted}/\${habits.length * 7}\n\`;
+    content += \`Perfect Days (7/7): \${stats.perfectDays}\n\`;
+    content += \`Weekly Streak: \${stats.weekStreak} days\n\`;
+    content += \`Completion Rate: \${stats.weekPercentage}%\n\n\`;
 
-    content += `DAILY BREAKDOWN\n`;
-    content += `===============\n`;
+    content += \`DAILY BREAKDOWN\n\`;
+    content += \`===============\n\`;
 
     weekDays.forEach((date) => {
       const { completed, total } = getCompletionForDay(date);
@@ -297,13 +288,13 @@ function HabitTrackerFirebase() {
         month: 'short',
         day: 'numeric',
       });
-      content += `\n${dayName}: ${completed}/${total}\n`;
+      content += \`\n\${dayName}: \${completed}/\${total}\n\`;
 
       habits.forEach((habit) => {
         const key = getDateKey(date);
         const dayData = dailyData[key] || {};
-        const status = dayData[habit.id] ? '✓' : '✗';
-        content += `  ${status} ${habit.title}\n`;
+        const status = dayData[habit.id] ? 'Completed' : 'Missed';
+        content += \`  [\${status}] \${habit.title}\n\`;
       });
     });
 
@@ -312,28 +303,24 @@ function HabitTrackerFirebase() {
       'href',
       'data:text/plain;charset=utf-8,' + encodeURIComponent(content)
     );
-    element.setAttribute('download', `habit-tracker-${today}.txt`);
+    element.setAttribute('download', \`habit-tracker-\${today}.txt\`);
     element.style.display = 'none';
     document.body.appendChild(element);
     element.click();
     document.body.removeChild(element);
   };
 
-  // Save dark mode preference
   useEffect(() => {
     localStorage.setItem('habitTrackerDarkMode', JSON.stringify(darkMode));
+    if (darkMode) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    } else {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
   }, [darkMode]);
 
   const weekDays = getWeekDays();
   const stats = getWeekStats();
-
-  const theme = {
-    bg: darkMode ? '#1a1a1a' : '#ffffff',
-    text: darkMode ? '#ffffff' : '#000000',
-    border: darkMode ? '#333333' : '#e5e7eb',
-    cardBg: darkMode ? '#2a2a2a' : '#f9fafb',
-    hover: darkMode ? '#3a3a3a' : '#f3f4f6',
-  };
 
   const getDayColor = (completed, total) => {
     if (completed === total) return '#10b981';
@@ -343,19 +330,12 @@ function HabitTrackerFirebase() {
 
   if (loading) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '100vh',
-          backgroundColor: theme.bg,
-          color: theme.text,
-        }}
-      >
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontSize: '48px', marginBottom: '16px' }}>⏳</div>
-          <div>Loading Habit Tracker...</div>
+          <div style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '16px' }} className="gradient-text">
+            Loading...
+          </div>
+          <div style={{ color: 'var(--text-secondary)' }}>Preparing Habit Tracker</div>
         </div>
       </div>
     );
@@ -363,45 +343,19 @@ function HabitTrackerFirebase() {
 
   if (showConfigForm) {
     return (
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '100vh',
-          backgroundColor: theme.bg,
-          color: theme.text,
-          padding: '20px',
-        }}
-      >
-        <div style={{ maxWidth: '600px', width: '100%' }}>
-          <h1 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px' }}>
-            🚀 First Time Setup
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', padding: '20px' }}>
+        <div className="glass-panel" style={{ maxWidth: '600px', width: '100%', padding: '40px' }}>
+          <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '20px' }} className="gradient-text">
+            First Time Setup
           </h1>
-          <p style={{ marginBottom: '20px', color: darkMode ? '#999' : '#666' }}>
-            To enable phone & web sync, you need to:
+          <p style={{ marginBottom: '20px', color: 'var(--text-secondary)' }}>
+            To enable phone and web sync, you need to:
           </p>
-          <ol style={{ marginBottom: '20px', color: darkMode ? '#999' : '#666' }}>
-            <li style={{ marginBottom: '10px' }}>
-              Create a free Firebase project at{' '}
-              <a
-                href="https://firebase.google.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: '#3b82f6', textDecoration: 'underline' }}
-              >
-                firebase.google.com
-              </a>
-            </li>
-            <li style={{ marginBottom: '10px' }}>
-              Set up Firestore Database (production mode)
-            </li>
-            <li style={{ marginBottom: '10px' }}>
-              Enable Anonymous Authentication
-            </li>
-            <li style={{ marginBottom: '10px' }}>
-              Copy your Firebase config from Project Settings
-            </li>
+          <ol style={{ marginBottom: '24px', color: 'var(--text-secondary)', paddingLeft: '20px', lineHeight: '1.6' }}>
+            <li>Create a free Firebase project at firebase.google.com</li>
+            <li>Set up Firestore Database (production mode)</li>
+            <li>Enable Anonymous Authentication</li>
+            <li>Copy your Firebase config from Project Settings</li>
             <li>Paste it below</li>
           </ol>
 
@@ -409,56 +363,42 @@ function HabitTrackerFirebase() {
             <textarea
               value={configInput}
               onChange={(e) => setConfigInput(e.target.value)}
-              placeholder={`Paste your Firebase config here:\n{\n  "apiKey": "...",\n  "authDomain": "...",\n  ...\n}`}
+              placeholder={\`Paste your Firebase config here:\n{\n  "apiKey": "...",\n  "authDomain": "...",\n  ...\n}\`}
               style={{
                 width: '100%',
                 minHeight: '200px',
-                padding: '12px',
-                borderRadius: '8px',
-                border: `1px solid ${theme.border}`,
-                backgroundColor: theme.cardBg,
-                color: theme.text,
+                padding: '16px',
+                borderRadius: '12px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--bg-secondary)',
+                color: 'var(--text-primary)',
                 fontFamily: 'monospace',
-                fontSize: '12px',
-                marginBottom: '16px',
-                boxSizing: 'border-box',
+                fontSize: '13px',
+                marginBottom: '20px',
+                resize: 'vertical',
               }}
             />
             <button
               type="submit"
+              className="glass-button"
               style={{
                 width: '100%',
-                padding: '12px',
-                borderRadius: '8px',
-                border: 'none',
+                padding: '16px',
+                borderRadius: '12px',
                 backgroundColor: '#10b981',
                 color: 'white',
-                fontWeight: 'bold',
-                cursor: 'pointer',
+                fontWeight: '600',
                 fontSize: '16px',
+                border: 'none',
+                cursor: 'pointer',
               }}
             >
-              ✅ Connect to Firebase
+              Connect to Firebase
             </button>
           </form>
 
-          <p
-            style={{
-              marginTop: '20px',
-              fontSize: '12px',
-              color: darkMode ? '#666' : '#999',
-              textAlign: 'center',
-            }}
-          >
-            📚{' '}
-            <a
-              href="https://firebase.google.com/docs/firestore/quickstart"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: '#3b82f6', textDecoration: 'underline' }}
-            >
-              Firebase Setup Guide
-            </a>
+          <p style={{ marginTop: '24px', fontSize: '13px', color: 'var(--text-secondary)', textAlign: 'center' }}>
+            Refer to the Firebase Setup Guide for detailed instructions.
           </p>
         </div>
       </div>
@@ -466,127 +406,85 @@ function HabitTrackerFirebase() {
   }
 
   return (
-    <div style={{ backgroundColor: theme.bg, color: theme.text, minHeight: '100vh', padding: '16px' }}>
-      <style>{`
-        * {
-          margin: 0;
-          padding: 0;
-          box-sizing: border-box;
-        }
-        body {
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          background-color: ${theme.bg};
-          color: ${theme.text};
-        }
+    <div style={{ minHeight: '100vh', padding: '24px 16px' }}>
+      <style>{\`
         input[type="checkbox"] {
-          width: 20px;
-          height: 20px;
+          width: 22px;
+          height: 22px;
           cursor: pointer;
           accent-color: #10b981;
         }
-        button {
+        .btn {
           border: none;
-          padding: 10px 16px;
-          border-radius: 6px;
+          padding: 12px 20px;
+          border-radius: 12px;
           cursor: pointer;
           font-size: 14px;
           font-weight: 600;
           transition: all 0.2s;
         }
-        button:hover {
-          opacity: 0.9;
-        }
-        .primary-btn {
-          background-color: #10b981;
-          color: white;
-        }
-        .danger-btn {
-          background-color: #ef4444;
-          color: white;
-        }
-        .secondary-btn {
-          background-color: ${theme.cardBg};
-          color: ${theme.text};
-          border: 1px solid ${theme.border};
-        }
-        @media (max-width: 640px) {
-          h1 { font-size: 24px; }
-          h2 { font-size: 18px; }
-        }
-      `}</style>
+        .btn-primary { background-color: #10b981; color: white; }
+        .btn-primary:hover { background-color: #059669; transform: translateY(-1px); }
+        .btn-danger { background-color: #ef4444; color: white; }
+        .btn-danger:hover { background-color: #dc2626; transform: translateY(-1px); }
+        .btn-secondary { background-color: var(--bg-secondary); color: var(--text-primary); border: 1px solid var(--border-color); }
+        .btn-secondary:hover { background-color: var(--hover-bg); }
+      \`}</style>
 
       <div style={{ maxWidth: '1000px', margin: '0 auto' }}>
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '32px', flexWrap: 'wrap', gap: '20px' }}>
           <div>
-            <h1 style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '4px' }}>Habit Tracker</h1>
-            <p style={{ fontSize: '14px', color: darkMode ? '#999' : '#666', fontStyle: 'italic' }}>
-              {quote}
+            <h1 className="gradient-text" style={{ fontSize: '36px', fontWeight: 'bold', marginBottom: '8px' }}>
+              Habit Tracker
+            </h1>
+            <p style={{ fontSize: '15px', color: 'var(--text-secondary)', fontStyle: 'italic', maxWidth: '600px' }}>
+              "{quote}"
             </p>
           </div>
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              style={{ background: theme.cardBg, border: `1px solid ${theme.border}`, padding: '8px 12px' }}
-              title={darkMode ? 'Light mode' : 'Dark mode'}
-            >
-              {darkMode ? '☀️' : '🌙'}
-            </button>
+          <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
             <div
+              className="glass-panel"
               style={{
-                padding: '8px 12px',
-                borderRadius: '6px',
-                backgroundColor: syncStatus === 'synced' ? '#d1fae5' : '#fef3c7',
-                color: syncStatus === 'synced' ? '#065f46' : '#92400e',
-                fontSize: '12px',
+                padding: '8px 16px',
+                fontSize: '13px',
                 fontWeight: '600',
-                minWidth: '60px',
+                color: syncStatus === 'synced' ? '#10b981' : syncStatus === 'syncing' ? '#fbbf24' : '#ef4444',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
               }}
             >
-              {syncStatus === 'syncing' ? '⟳ Syncing' : syncStatus === 'synced' ? '✓ Synced' : '⚠ Error'}
+              {syncStatus === 'syncing' ? 'Syncing...' : syncStatus === 'synced' ? 'Synced' : 'Sync Error'}
             </div>
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className="glass-button"
+              style={{ padding: '8px 16px', borderRadius: '16px', cursor: 'pointer', border: 'none', fontWeight: '600', color: 'var(--text-primary)' }}
+            >
+              {darkMode ? 'Light Mode' : 'Dark Mode'}
+            </button>
           </div>
         </div>
 
         {/* Current Date */}
-        <div style={{ fontSize: '16px', fontWeight: '600', marginBottom: '20px' }}>
-          Today:{' '}
-          {currentDate.toLocaleDateString('en-US', {
-            weekday: 'long',
-            month: 'long',
-            day: 'numeric',
-          })}
+        <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '24px', color: 'var(--text-primary)' }}>
+          Today: {currentDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
         </div>
 
         {/* Stats Grid */}
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-            gap: '12px',
-            marginBottom: '24px',
-          }}
-        >
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '32px' }}>
           {[
-            { label: 'This Week', value: `${stats.totalCompleted}/${habits.length * 7}` },
+            { label: 'Weekly Progress', value: \`\${stats.totalCompleted} / \${habits.length * 7}\` },
             { label: 'Perfect Days', value: stats.perfectDays },
-            { label: 'Best Streak', value: `${stats.weekStreak}d` },
-            { label: 'Rate', value: `${stats.weekPercentage}%` },
+            { label: 'Best Streak', value: \`\${stats.weekStreak} Days\` },
+            { label: 'Completion Rate', value: \`\${stats.weekPercentage}%\` },
           ].map((stat, idx) => (
-            <div
-              key={idx}
-              style={{
-                backgroundColor: theme.cardBg,
-                padding: '12px',
-                borderRadius: '8px',
-                border: `1px solid ${theme.border}`,
-                textAlign: 'center',
-              }}
-            >
-              <div style={{ fontSize: '11px', color: darkMode ? '#999' : '#666', marginBottom: '4px' }}>
+            <div key={idx} className="glass-panel" style={{ padding: '20px', textAlign: 'center' }}>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: '500', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 {stat.label}
               </div>
-              <div style={{ fontSize: '20px', fontWeight: 'bold', color: '#10b981' }}>
+              <div style={{ fontSize: '28px', fontWeight: 'bold', color: '#10b981' }}>
                 {stat.value}
               </div>
             </div>
@@ -594,65 +492,59 @@ function HabitTrackerFirebase() {
         </div>
 
         {/* Daily Habits */}
-        <div style={{ marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '12px' }}>
+        <div style={{ marginBottom: '40px' }}>
+          <h2 style={{ fontSize: '22px', fontWeight: '600', marginBottom: '16px', color: 'var(--text-primary)' }}>
             Today's Habits
           </h2>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-              gap: '10px',
-            }}
-          >
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '16px' }}>
             {habits.map((habit) => (
               <div
                 key={habit.id}
+                className="glass-panel"
                 style={{
-                  backgroundColor: theme.cardBg,
-                  border: `2px solid ${todayData[habit.id] ? habit.color : theme.border}`,
-                  borderRadius: '8px',
-                  padding: '12px',
+                  borderLeft: \`4px solid \${todayData[habit.id] ? habit.color : 'var(--border-color)'}\`,
+                  padding: '16px',
                   cursor: 'pointer',
-                  transition: 'all 0.2s',
+                  transition: 'all 0.2s ease',
+                  opacity: todayData[habit.id] ? 0.7 : 1,
+                  transform: todayData[habit.id] ? 'scale(0.98)' : 'scale(1)',
                 }}
                 onClick={() => toggleHabit(habit.id)}
               >
-                <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '16px' }}>
                   <input
                     type="checkbox"
                     checked={todayData[habit.id] || false}
                     onChange={() => toggleHabit(habit.id)}
-                    style={{ marginRight: '10px', marginTop: '2px', flexShrink: 0 }}
+                    style={{ marginTop: '2px', flexShrink: 0 }}
                   />
                   <div style={{ flex: 1 }}>
                     <div
                       style={{
-                        fontSize: '13px',
+                        fontSize: '15px',
                         fontWeight: '600',
                         textDecoration: todayData[habit.id] ? 'line-through' : 'none',
-                        color: todayData[habit.id]
-                          ? darkMode
-                            ? '#666'
-                            : '#999'
-                          : theme.text,
-                        marginBottom: '2px',
+                        color: 'var(--text-primary)',
+                        marginBottom: '4px',
                       }}
                     >
                       {habit.title}
                     </div>
-                    <div style={{ fontSize: '12px', color: darkMode ? '#999' : '#666', marginBottom: '6px' }}>
+                    <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px', lineHeight: '1.4' }}>
                       {habit.description}
                     </div>
                     <div
                       style={{
                         display: 'inline-block',
-                        fontSize: '10px',
+                        fontSize: '11px',
                         fontWeight: '600',
-                        padding: '3px 6px',
-                        backgroundColor: theme.hover,
-                        borderRadius: '4px',
-                        color: darkMode ? '#999' : '#666',
+                        padding: '4px 8px',
+                        backgroundColor: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '6px',
+                        color: 'var(--text-secondary)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
                       }}
                     >
                       {habit.category}
@@ -665,17 +557,11 @@ function HabitTrackerFirebase() {
         </div>
 
         {/* Weekly View */}
-        <div style={{ marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '18px', fontWeight: 'bold', marginBottom: '12px' }}>
+        <div style={{ marginBottom: '40px' }}>
+          <h2 style={{ fontSize: '22px', fontWeight: '600', marginBottom: '16px', color: 'var(--text-primary)' }}>
             Weekly Overview
           </h2>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(85px, 1fr))',
-              gap: '8px',
-            }}
-          >
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(100px, 1fr))', gap: '12px' }}>
             {weekDays.map((date) => {
               const { completed, total } = getCompletionForDay(date);
               const dayColor = getDayColor(completed, total);
@@ -685,38 +571,24 @@ function HabitTrackerFirebase() {
                 <div
                   key={getDateKey(date)}
                   onClick={() => setCurrentDate(date)}
+                  className="glass-panel"
                   style={{
-                    backgroundColor: isToday ? theme.hover : theme.cardBg,
-                    border: isToday ? `2px solid ${dayColor}` : `1px solid ${theme.border}`,
-                    borderRadius: '8px',
-                    padding: '12px',
+                    border: isToday ? \`2px solid \${dayColor}\` : '1px solid var(--border-color)',
+                    padding: '16px',
                     textAlign: 'center',
                     cursor: 'pointer',
+                    backgroundColor: isToday ? 'var(--hover-bg)' : 'var(--glass-bg)',
                     transition: 'all 0.2s',
                   }}
                 >
-                  <div style={{ fontSize: '11px', fontWeight: '600', color: darkMode ? '#999' : '#666', marginBottom: '4px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '600', color: 'var(--text-secondary)', marginBottom: '8px' }}>
                     {date.toLocaleDateString('en-US', { weekday: 'short' })}
                   </div>
-                  <div style={{ fontSize: '10px', color: dayColor, fontWeight: 'bold', marginBottom: '8px' }}>
-                    {completed}/{total}
+                  <div style={{ fontSize: '14px', color: dayColor, fontWeight: 'bold', marginBottom: '12px' }}>
+                    {completed} / {total}
                   </div>
-                  <div
-                    style={{
-                      width: '100%',
-                      height: '3px',
-                      backgroundColor: theme.hover,
-                      borderRadius: '2px',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <div
-                      style={{
-                        height: '100%',
-                        width: `${(completed / total) * 100}%`,
-                        backgroundColor: dayColor,
-                      }}
-                    />
+                  <div style={{ width: '100%', height: '4px', backgroundColor: 'var(--border-color)', borderRadius: '2px', overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: \`\${(completed / total) * 100}%\`, backgroundColor: dayColor, transition: 'width 0.3s ease' }} />
                   </div>
                 </div>
               );
@@ -725,63 +597,30 @@ function HabitTrackerFirebase() {
         </div>
 
         {/* Actions */}
-        <div
-          style={{
-            display: 'flex',
-            gap: '10px',
-            flexWrap: 'wrap',
-            marginBottom: '20px',
-          }}
-        >
-          <button onClick={exportData} className="primary-btn">
-            📥 Export
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginTop: '40px' }}>
+          <button onClick={exportData} className="btn btn-primary glass-button">
+            Export Data
           </button>
-          <button onClick={() => setShowResetConfirm(true)} className="danger-btn">
-            🔄 Reset
+          <button onClick={() => setShowResetConfirm(true)} className="btn btn-danger glass-button">
+            Reset Week
           </button>
         </div>
 
         {/* Reset Confirmation */}
         {showResetConfirm && (
-          <div
-            style={{
-              position: 'fixed',
-              top: '0',
-              left: '0',
-              right: '0',
-              bottom: '0',
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
-              display: 'flex',
-              justifyContent: 'center',
-              alignItems: 'center',
-              zIndex: '1000',
-            }}
-          >
-            <div
-              style={{
-                backgroundColor: theme.bg,
-                padding: '20px',
-                borderRadius: '12px',
-                border: `1px solid ${theme.border}`,
-                maxWidth: '90%',
-                width: '400px',
-              }}
-            >
-              <h3 style={{ fontSize: '16px', fontWeight: 'bold', marginBottom: '10px' }}>
+          <div style={{ position: 'fixed', top: '0', left: '0', right: '0', bottom: '0', backgroundColor: 'rgba(0, 0, 0, 0.6)', backdropFilter: 'blur(4px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: '1000' }}>
+            <div className="glass-panel" style={{ padding: '32px', maxWidth: '90%', width: '400px', backgroundColor: 'var(--bg-primary)' }}>
+              <h3 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '12px', color: 'var(--text-primary)' }}>
                 Reset This Week?
               </h3>
-              <p style={{ marginBottom: '16px', color: darkMode ? '#999' : '#666', fontSize: '14px' }}>
-                This will clear all habit data for this week.
+              <p style={{ marginBottom: '24px', color: 'var(--text-secondary)', fontSize: '15px', lineHeight: '1.5' }}>
+                This action will clear all habit data for the current week. This cannot be undone.
               </p>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button onClick={resetWeek} className="danger-btn" style={{ flex: 1 }}>
-                  Reset
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button onClick={resetWeek} className="btn btn-danger" style={{ flex: 1 }}>
+                  Confirm Reset
                 </button>
-                <button
-                  onClick={() => setShowResetConfirm(false)}
-                  className="secondary-btn"
-                  style={{ flex: 1 }}
-                >
+                <button onClick={() => setShowResetConfirm(false)} className="btn btn-secondary" style={{ flex: 1 }}>
                   Cancel
                 </button>
               </div>
