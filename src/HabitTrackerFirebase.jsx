@@ -11,6 +11,7 @@ import {
   setDoc,
   getDocs,
 } from 'firebase/firestore';
+import { RAGAgent } from './RAGAgent';
 
 const HABITS = [
   {
@@ -762,6 +763,9 @@ function HabitTrackerFirebase() {
             })}
           </div>
         </div>
+
+        {/* AI Habit Coach */}
+        <RAGAgent dailyData={dailyData} habits={habits} currentDate={currentDate} />
 
         {/* Actions */}
         <div
