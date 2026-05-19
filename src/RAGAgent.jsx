@@ -60,7 +60,7 @@ Provide a highly analytical, objective, and concise response (2-3 sentences). Fo
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'llama-3.1-70b-versatile',
+          model: 'gemma2-9b-it',
           messages: [
             { role: 'system', content: 'You are a personal data analyst. Provide concise, objective insights.' },
             { role: 'user', content: prompt }
@@ -70,12 +70,13 @@ Provide a highly analytical, objective, and concise response (2-3 sentences). Fo
         }),
       });
 
-      if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(`API_ERROR_${res.status}: ${errorData.error?.message || 'Request failed'}`);
-      }
-
       const data = await res.json();
+
+      if (!res.ok) {
+        const errorMsg = data.error?.message || 'Request failed';
+        console.error('Groq API Error Response:', data);
+        throw new Error(`API_ERROR_${res.status}: ${errorMsg}`);
+      }
 
       if (data.choices?.[0]?.message?.content) {
         setResponse(data.choices[0].message.content);
