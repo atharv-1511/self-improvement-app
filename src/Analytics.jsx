@@ -78,10 +78,10 @@ export function Analytics({ dailyData, habits, currentDate }) {
         <div className="mono-text" style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>T-14 DAYS WINDOW</div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1px', backgroundColor: 'var(--border-color)', border: '1px solid var(--border-color)' }}>
-        
-        <div className="qs-panel" style={{ padding: '24px', border: 'none', borderRadius: '0' }}>
+
+        <div className="qs-panel" style={{ padding: '24px', border: 'none', borderRadius: '0', minWidth: 0 }}>
           <h3 className="mono-text" style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '24px' }}>COMPLETION_VOLUME_TREND</h3>
-          <div style={{ width: '100%', height: '250px' }}>
+          <div style={{ width: '100%', height: '250px', minWidth: 0 }}>
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={trendData} margin={{ top: 5, right: 20, bottom: 5, left: -20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />
@@ -94,9 +94,9 @@ export function Analytics({ dailyData, habits, currentDate }) {
           </div>
         </div>
 
-        <div className="qs-panel" style={{ padding: '24px', border: 'none', borderRadius: '0' }}>
+        <div className="qs-panel" style={{ padding: '24px', border: 'none', borderRadius: '0', minWidth: 0 }}>
           <h3 className="mono-text" style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '24px' }}>CATEGORY_DISTRIBUTION_RADAR (%)</h3>
-          <div style={{ width: '100%', height: '250px' }}>
+          <div style={{ width: '100%', height: '250px', minWidth: 0 }}>
             <ResponsiveContainer width="100%" height="100%">
               <RadarChart cx="50%" cy="50%" outerRadius="70%" data={categoryData}>
                 <PolarGrid stroke="var(--border-color)" />
@@ -109,9 +109,9 @@ export function Analytics({ dailyData, habits, currentDate }) {
           </div>
         </div>
 
-        <div className="qs-panel" style={{ padding: '24px', border: 'none', borderRadius: '0', gridColumn: '1 / -1' }}>
+        <div className="qs-panel" style={{ padding: '24px', border: 'none', borderRadius: '0', gridColumn: '1 / -1', minWidth: 0 }}>
           <h3 className="mono-text" style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '24px' }}>INDIVIDUAL_HABIT_CONSISTENCY (%)</h3>
-          <div style={{ width: '100%', height: '200px' }}>
+          <div style={{ width: '100%', height: '200px', minWidth: 0 }}>
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={habitData} margin={{ top: 5, right: 0, bottom: 5, left: -20 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="var(--border-color)" vertical={false} />

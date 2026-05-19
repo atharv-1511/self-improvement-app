@@ -49,6 +49,15 @@ function HabitTrackerFirebase() {
       }
     };
     initFirebase();
+
+    const handleOnline = () => setSyncStatus('SYNCED');
+    const handleOffline = () => setSyncStatus('OFFLINE');
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   const setupFirebase = async (config) => {
@@ -70,6 +79,15 @@ function HabitTrackerFirebase() {
         });
         setDailyData(data);
         setSyncStatus('SYNCED');
+      }, (error) => {
+        if (error.code === 'permission-denied') {
+          setSyncStatus('ERROR');
+          console.error('Firestore permissions error:', error.message);
+        } else if (error.code === 'unavailable') {
+          setSyncStatus('OFFLINE');
+        } else {
+          setSyncStatus('ERROR');
+        }
       });
 
       setLoading(false);

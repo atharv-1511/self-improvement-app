@@ -30,11 +30,12 @@ export function RAGAgent({ dailyData, habits, currentDate }) {
 
     const apiKey = process.env.REACT_APP_GROQ_API_KEY;
     if (!apiKey) {
-      setResponse('ERR: GROQ_API_KEY_NOT_FOUND\nPlease configure the environment variable.');
+      setResponse('ERR: GROQ_API_KEY_NOT_CONFIGURED\nAdd REACT_APP_GROQ_API_KEY to .env file');
       return;
     }
 
     setLoading(true);
+    setResponse('');
     try {
       const stats = getHabitStats();
       const habitsList = habits.map(h => `- ${h.title} (${h.category})`).join('\n');
@@ -69,21 +70,22 @@ Provide a highly analytical, objective, and concise response (2-3 sentences). Fo
         }),
       });
 
-      const data = await res.json();
-      console.log('Groq API Response:', data);
-
       if (!res.ok) {
-        throw new Error(`API_ERR_${res.status}: ${data.error?.message || JSON.stringify(data)}`);
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(`API_ERROR_${res.status}: ${errorData.error?.message || 'Request failed'}`);
       }
 
-      if (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) {
+      const data = await res.json();
+
+      if (data.choices?.[0]?.message?.content) {
         setResponse(data.choices[0].message.content);
+        setQuery('');
       } else {
-        throw new Error(`INVALID_RESPONSE_FORMAT: ${JSON.stringify(data)}`);
+        throw new Error('INVALID_RESPONSE: No content in API response');
       }
     } catch (error) {
-      console.error('Groq API Error:', error);
-      setResponse(`ERR: ${error.message || 'API_CONNECTION_FAILED'}`);
+      console.error('RAGAgent Error:', error);
+      setResponse(`ERR: ${error.message}`);
     } finally {
       setLoading(false);
     }
