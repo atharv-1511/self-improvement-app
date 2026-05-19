@@ -1,10 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 export function RAGAgent({ dailyData, habits, currentDate }) {
   const [query, setQuery] = useState('');
   const [response, setResponse] = useState('');
   const [loading, setLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
+  const [availableModel, setAvailableModel] = useState('gpt-4o');
+
+  useEffect(() => {
+    const checkAvailableModels = async () => {
+      const apiKey = process.env.REACT_APP_GROQ_API_KEY;
+      if (!apiKey) return;
+
+      try {
+        const res = await fetch('https://api.groq.com/openai/v1/models', {
+          headers: { 'Authorization': `Bearer ${apiKey}` }
+        });
+        const data = await res.json();
+        if (data.data && data.data.length > 0) {
+          const modelId = data.data[0].id;
+          console.log('Available models:', data.data.map(m => m.id));
+          setAvailableModel(modelId);
+        }
+      } catch (error) {
+        console.warn('Could not fetch available models, using default');
+      }
+    };
+    checkAvailableModels();
+  }, []);
 
   const getHabitStats = () => {
     const today = currentDate.toISOString().split('T')[0];
@@ -60,7 +83,7 @@ Provide a highly analytical, objective, and concise response (2-3 sentences). Fo
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gemma2-9b-it',
+          model: availableModel,
           messages: [
             { role: 'system', content: 'You are a personal data analyst. Provide concise, objective insights.' },
             { role: 'user', content: prompt }
