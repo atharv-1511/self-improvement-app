@@ -5,6 +5,7 @@ import { getFirestore, collection, doc, setDoc, onSnapshot } from 'firebase/fire
 import { RAGAgent } from './RAGAgent';
 import { Notes } from './Notes';
 import { Analytics } from './Analytics';
+import { Stopwatches } from './Stopwatches';
 import './index.css';
 
 const HABITS = [
@@ -251,13 +252,15 @@ function HabitTrackerFirebase() {
     <div style={{ minHeight: '100vh', padding: '40px 24px', maxWidth: '1000px', margin: '0 auto' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', borderBottom: '1px solid var(--border-color)', paddingBottom: '24px', marginBottom: '40px', flexWrap: 'wrap', gap: '20px' }}>
         <div>
-          <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '4px' }}>Quantified Self</h1>
-          <div className="mono-text" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>HABIT TRACKING & ANALYSIS MODULE</div>
+          <h1 style={{ fontSize: '32px', fontWeight: '700', marginBottom: '4px' }}>Atharv's Personal</h1>
+          <div className="mono-text" style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>HABIT TRACKING & PERSONAL INSIGHTS</div>
         </div>
         <div className="mono-text" style={{ fontSize: '12px', padding: '4px 8px', border: '1px solid var(--border-color)', color: syncStatus === 'SYNCED' ? '#10b981' : '#fbbf24', backgroundColor: 'var(--bg-secondary)' }}>
           STATUS: {syncStatus}
         </div>
       </div>
+
+      <Stopwatches />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1px', backgroundColor: 'var(--border-color)', border: '1px solid var(--border-color)', marginBottom: '40px' }}>
         <div className="qs-panel" style={{ padding: '24px', border: 'none', borderRadius: '0' }}>

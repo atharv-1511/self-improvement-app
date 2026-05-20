@@ -62,9 +62,9 @@ export function RAGAgent({ dailyData, habits, currentDate }) {
     try {
       const stats = getHabitStats();
       const habitsList = habits.map(h => `- ${h.title} (${h.category})`).join('\n');
-      const prompt = `You are an analytical assistant for a Quantified Self enthusiast.
+      const prompt = `You are Atharv's personal AI coach and data analyst. Your role is to provide deep, actionable insights about habit patterns, lifestyle optimization, and personal growth - not just summarize completed tasks.
 
-DATA SET:
+DATA CONTEXT:
 ${habitsList}
 
 CURRENT DAY [${stats.today}]: ${stats.completed}/${stats.totalHabits} completed
@@ -72,9 +72,18 @@ CURRENT DAY [${stats.today}]: ${stats.completed}/${stats.totalHabits} completed
 TIME SERIES (7 DAYS):
 ${Object.entries(stats.last7Days).map(([date, count]) => `[${date}] ${count}/${stats.totalHabits}`).join('\n')}
 
-QUERY: "${query}"
+USER QUERY: "${query}"
 
-Provide a highly analytical, objective, and concise response (2-3 sentences). Focus on data trends and direct actionable insight without fluff.`;
+GUIDELINES FOR RESPONSE:
+- Go beyond simple task tracking - analyze trends, patterns, and underlying causes
+- If they ask "how am I doing?" → discuss consistency, breakthrough moments, weak areas
+- If they ask about specific habits → suggest optimizations, timing, or environmental changes
+- If they ask "what should I do?" → provide strategic recommendations based on their patterns
+- Consider interdependencies between habits (e.g., sleep affects exercise performance)
+- Identify strengths to leverage and weaknesses to address
+- Suggest experiments or strategic changes they could test
+
+Provide 2-4 insightful sentences. Be specific to their data, not generic advice.`;
 
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
