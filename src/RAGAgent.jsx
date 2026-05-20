@@ -62,28 +62,31 @@ export function RAGAgent({ dailyData, habits, currentDate }) {
     try {
       const stats = getHabitStats();
       const habitsList = habits.map(h => `- ${h.title} (${h.category})`).join('\n');
-      const prompt = `You are Atharv's personal AI coach and data analyst. Your role is to provide deep, actionable insights about habit patterns, lifestyle optimization, and personal growth - not just summarize completed tasks.
 
-DATA CONTEXT:
+      const habitContext = `HABIT TRACKING DATA (Available if relevant to the query):
 ${habitsList}
 
 CURRENT DAY [${stats.today}]: ${stats.completed}/${stats.totalHabits} completed
 
 TIME SERIES (7 DAYS):
-${Object.entries(stats.last7Days).map(([date, count]) => `[${date}] ${count}/${stats.totalHabits}`).join('\n')}
+${Object.entries(stats.last7Days).map(([date, count]) => `[${date}] ${count}/${stats.totalHabits}`).join('\n')}`;
+
+      const prompt = `You are Atharv's personal AI assistant. You can:
+1. Have normal conversations (greet, chat, answer questions, discuss ideas)
+2. Provide habit tracking analysis when the user asks about their habits/progress
+3. Give life coaching & optimization suggestions based on their data
+
+IMPORTANT:
+- If the user just says "Hi" or asks general questions, respond naturally without forcing habit context
+- Only use the habit data below when it's actually relevant to their query
+- Be conversational and friendly, not robotic
+
+${habitContext}
 
 USER QUERY: "${query}"
 
-GUIDELINES FOR RESPONSE:
-- Go beyond simple task tracking - analyze trends, patterns, and underlying causes
-- If they ask "how am I doing?" → discuss consistency, breakthrough moments, weak areas
-- If they ask about specific habits → suggest optimizations, timing, or environmental changes
-- If they ask "what should I do?" → provide strategic recommendations based on their patterns
-- Consider interdependencies between habits (e.g., sleep affects exercise performance)
-- Identify strengths to leverage and weaknesses to address
-- Suggest experiments or strategic changes they could test
-
-Provide 2-4 insightful sentences. Be specific to their data, not generic advice.`;
+If the query is about habits/personal growth: Use the data above to provide insights.
+If the query is general conversation: Just respond naturally as an AI assistant.`;
 
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -94,11 +97,11 @@ Provide 2-4 insightful sentences. Be specific to their data, not generic advice.
         body: JSON.stringify({
           model: availableModel,
           messages: [
-            { role: 'system', content: 'You are a personal data analyst. Provide concise, objective insights.' },
+            { role: 'system', content: 'You are a helpful, friendly AI assistant. Be natural and conversational.' },
             { role: 'user', content: prompt }
           ],
           max_tokens: 512,
-          temperature: 0.2,
+          temperature: 0.7,
         }),
       });
 
