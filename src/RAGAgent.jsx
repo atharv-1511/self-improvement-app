@@ -17,13 +17,32 @@ export function RAGAgent({ dailyData, habits, currentDate }) {
           headers: { 'Authorization': `Bearer ${apiKey}` }
         });
         const data = await res.json();
+
         if (data.data && data.data.length > 0) {
-          const modelId = data.data[0].id;
-          console.log('Available models:', data.data.map(m => m.id));
-          setAvailableModel(modelId);
+          // Filter for reliable production models, exclude text-to-speech, deprecated, or restricted models
+          const reliableModels = data.data.filter(m => {
+            const id = m.id.toLowerCase();
+            const isTextToSpeech = id.includes('whisper') || id.includes('tts');
+            const isRestricted = m.description?.includes('requires') || id.includes('orpheus');
+            const isDeprecated = id.includes('deprecated');
+            return !isTextToSpeech && !isRestricted && !isDeprecated;
+          });
+
+          if (reliableModels.length > 0) {
+            // Prioritize common models
+            const preferredOrder = ['llama', 'mixtral', 'gemma', 'gpt'];
+            const sorted = reliableModels.sort((a, b) => {
+              const aPrefer = preferredOrder.findIndex(p => a.id.toLowerCase().includes(p));
+              const bPrefer = preferredOrder.findIndex(p => b.id.toLowerCase().includes(p));
+              return aPrefer - bPrefer;
+            });
+            console.log('Available reliable models:', sorted.map(m => m.id));
+            setAvailableModel(sorted[0].id);
+          }
         }
       } catch (error) {
         console.warn('Could not fetch available models, using default');
+        setAvailableModel('gpt-4o');
       }
     };
     checkAvailableModels();
