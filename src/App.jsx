@@ -1,7 +1,8 @@
-import HabitTrackerFirebase from './HabitTrackerFirebase';
+import MacroChat from './MacroChat';
+import './index.css';
 
 function App() {
-  return <HabitTrackerFirebase />;
+  return <MacroChat />;
 }
 
 export default App;
