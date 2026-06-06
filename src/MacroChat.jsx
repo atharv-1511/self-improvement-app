@@ -240,7 +240,7 @@ User input: "${userMessage}"`;
             <div className="macro-label">Calories</div>
             <div className="macro-value" style={{ color: 'var(--color-calories)' }}>{totalCalories}</div>
             <div className="progress-bar-bg">
-              <div className="progress-bar-fill" style={{ width: \`\${calProgress}%\`, backgroundColor: 'var(--color-calories)' }} />
+              <div className="progress-bar-fill" style={{ width: calProgress + '%', backgroundColor: 'var(--color-calories)' }} />
             </div>
             <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>/ {DAILY_TARGETS.calories}</div>
           </div>
@@ -249,7 +249,7 @@ User input: "${userMessage}"`;
             <div className="macro-label">Protein</div>
             <div className="macro-value" style={{ color: 'var(--color-protein)' }}>{totalProtein}g</div>
             <div className="progress-bar-bg">
-              <div className="progress-bar-fill" style={{ width: \`\${proProgress}%\`, backgroundColor: 'var(--color-protein)' }} />
+              <div className="progress-bar-fill" style={{ width: proProgress + '%', backgroundColor: 'var(--color-protein)' }} />
             </div>
             <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>/ {DAILY_TARGETS.protein}g</div>
           </div>
@@ -258,7 +258,7 @@ User input: "${userMessage}"`;
             <div className="macro-label">Carbs</div>
             <div className="macro-value" style={{ color: 'var(--color-carbs)' }}>{totalCarbs}g</div>
             <div className="progress-bar-bg">
-              <div className="progress-bar-fill" style={{ width: \`\${carbProgress}%\`, backgroundColor: 'var(--color-carbs)' }} />
+              <div className="progress-bar-fill" style={{ width: carbProgress + '%', backgroundColor: 'var(--color-carbs)' }} />
             </div>
             <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>/ {DAILY_TARGETS.carbs}g</div>
           </div>
@@ -267,7 +267,7 @@ User input: "${userMessage}"`;
             <div className="macro-label">Fat</div>
             <div className="macro-value" style={{ color: 'var(--color-fat)' }}>{totalFat}g</div>
             <div className="progress-bar-bg">
-              <div className="progress-bar-fill" style={{ width: \`\${fatProgress}%\`, backgroundColor: 'var(--color-fat)' }} />
+              <div className="progress-bar-fill" style={{ width: fatProgress + '%', backgroundColor: 'var(--color-fat)' }} />
             </div>
             <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px' }}>/ {DAILY_TARGETS.fat}g</div>
           </div>
@@ -283,7 +283,7 @@ User input: "${userMessage}"`;
         )}
         
         {chatHistory.map((msg) => (
-          <div key={msg.id} className={\`chat-message \${msg.role}\`}>
+          <div key={msg.id} className={"chat-message " + msg.role}>
             <div>{msg.text}</div>
             
             {/* If the AI logged a meal, show the nutrition card */}
