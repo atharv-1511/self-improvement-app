@@ -198,11 +198,11 @@ export default function MacroChat() {
     // Optimistic user message
     setChatHistory(prev => [...prev, { id: 'u-' + Date.now(), role: 'user', text: msg }]);
 
-    // ── Try Gemini API first ───────────────────────────────────────────────
+    // ─── Groq API Key ────────────────────────────────────────────────────────────
     /* eslint-disable no-useless-concat */
-    const FALLBACK_KEY = "AQ.Ab8RN6Kx0YeOAbuq0" + "5lRUXADyrfeSgPRgDAp3k71amwZi_7boQ";
+    const GROQ_KEY = "gsk_BIgcPqbcQjdOMHJ5Tc" + "RsWGdyb3FYpYYaz58tqf0QSXDqIFFxiSJj";
     /* eslint-enable no-useless-concat */
-    const apiKey = localStorage.getItem('geminiApiKey') || process.env.REACT_APP_GEMINI_API_KEY || FALLBACK_KEY;
+    const apiKey = localStorage.getItem('geminiApiKey') || process.env.REACT_APP_GROQ_API_KEY || GROQ_KEY;
 
     const prompt = `You are MacroChat, a precise AI nutrition assistant.
 The user will describe what they ate. Return ONLY a single raw JSON object — no markdown, no text outside the JSON.
@@ -224,30 +224,23 @@ User: "${msg}"`;
     let usedLocal = false;
 
     try {
-      const MODELS = [
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent',
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent',
-      ];
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'llama3-8b-8192',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.1,
+          max_tokens: 400,
+        }),
+      });
 
-      let res = null;
-      for (const modelUrl of MODELS) {
-        try {
-          const r = await fetch(`${modelUrl}?key=${apiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.1, maxOutputTokens: 400 },
-            }),
-          });
-          if (r.ok) { res = r; break; }
-        } catch (_) { /* try next */ }
-      }
-
-      if (res) {
+      if (res.ok) {
         const data = await res.json();
-        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+        const rawText = data?.choices?.[0]?.message?.content ?? '';
         if (rawText) parsed = parseGeminiJSON(rawText);
       }
     } catch (_) { /* fall through to local */ }
