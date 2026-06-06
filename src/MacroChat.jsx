@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
-import { getFirestore, collection, doc, setDoc, onSnapshot, query, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
+import { getFirestore, collection, onSnapshot, query, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
 
 const DAILY_TARGETS = {
   calories: 2500,
@@ -18,7 +18,7 @@ function MacroChat() {
   const [loading, setLoading] = useState(true);
   const [showConfigForm, setShowConfigForm] = useState(false);
   const [configInput, setConfigInput] = useState('');
-  const [syncDeviceId] = useState('shared-habits');
+  
   
   const [input, setInput] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
@@ -156,10 +156,10 @@ User input: "${userMessage}"`;
       let aiText = data.candidates[0].content.parts[0].text.trim();
       
       // Clean up markdown formatting if Gemini still included it
-      if (aiText.startsWith('\`\`\`json')) {
-        aiText = aiText.replace(/^\`\`\`json\s*/, '').replace(/\s*\`\`\`$/, '');
-      } else if (aiText.startsWith('\`\`\`')) {
-        aiText = aiText.replace(/^\`\`\`\s*/, '').replace(/\s*\`\`\`$/, '');
+      if (aiText.startsWith('```json')) {
+        aiText = aiText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+      } else if (aiText.startsWith('```')) {
+        aiText = aiText.replace(/^```\s*/, '').replace(/\s*```$/, '');
       }
 
       const parsed = JSON.parse(aiText);
