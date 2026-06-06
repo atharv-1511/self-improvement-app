@@ -168,22 +168,36 @@ If the user asks a general nutrition question (not logging food), return zeros f
 User message: "${msg}"`;
 
     try {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
-        {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents:         [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
-          }),
-        }
-      );
+      // Try models in order — free tier first
+      const MODELS = [
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
+        'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent',
+      ];
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData?.error?.message || `HTTP ${res.status}`);
+      let res = null;
+      let lastError = '';
+      for (const modelUrl of MODELS) {
+        try {
+          res = await fetch(`${modelUrl}?key=${apiKey}`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents:         [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
+            }),
+          });
+          if (res.ok) break; // success — stop trying
+          const errBody = await res.json().catch(() => ({}));
+          lastError = errBody?.error?.message || `HTTP ${res.status}`;
+          res = null; // mark as failed, try next
+        } catch (fetchErr) {
+          lastError = fetchErr.message;
+          res = null;
+        }
       }
+
+      if (!res) throw new Error(lastError || 'All models failed');
 
       const data    = await res.json();
       const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
