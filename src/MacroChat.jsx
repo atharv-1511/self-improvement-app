@@ -44,6 +44,7 @@ function MacroChat() {
       }
     };
     initFirebase();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const setupFirebase = async (config) => {
