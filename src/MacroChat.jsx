@@ -9,7 +9,6 @@ const TARGETS = { calories: 2300, protein: 130, carbs: 300, fat: 80 };
 // ─── Module-level singletons ──────────────────────────────────────────────────
 let _db   = null;
 let _auth = null;
-let _user = null;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt     = (n) => (n == null ? 0 : Math.round(n));
@@ -198,7 +197,6 @@ export default function MacroChat() {
       _auth      = getAuth(app);
       _db        = getFirestore(app);
       const cred = await signInAnonymously(_auth);
-      _user      = cred.user;
 
       let activeCode = localStorage.getItem('syncCode');
       if (!activeCode) {
