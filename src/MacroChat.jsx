@@ -181,7 +181,9 @@ export default function MacroChat() {
   const handleSaveSettings = (e) => {
     e.preventDefault();
     if (settingsKey.trim()) {
-      localStorage.setItem('geminiApiKey', settingsKey.trim());
+      localStorage.setItem('groqApiKey', settingsKey.trim());
+      // Clear any old Gemini key that might interfere
+      localStorage.removeItem('geminiApiKey');
       setSaveMsg('✓ API key saved! Reload to apply.');
       setTimeout(() => setSaveMsg(''), 3000);
     }
@@ -202,7 +204,7 @@ export default function MacroChat() {
     /* eslint-disable no-useless-concat */
     const GROQ_KEY = "gsk_BIgcPqbcQjdOMHJ5Tc" + "RsWGdyb3FYpYYaz58tqf0QSXDqIFFxiSJj";
     /* eslint-enable no-useless-concat */
-    const apiKey = localStorage.getItem('geminiApiKey') || process.env.REACT_APP_GROQ_API_KEY || GROQ_KEY;
+    const apiKey = localStorage.getItem('groqApiKey') || process.env.REACT_APP_GROQ_API_KEY || GROQ_KEY;
 
     const prompt = `You are MacroChat, a precise AI nutrition assistant.
 The user will describe what they ate. Return ONLY a single raw JSON object — no markdown, no text outside the JSON.
@@ -242,8 +244,17 @@ User: "${msg}"`;
         const data = await res.json();
         const rawText = data?.choices?.[0]?.message?.content ?? '';
         if (rawText) parsed = parseGeminiJSON(rawText);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        console.error('Groq API error:', errData);
+        // Show the real error in chat so user knows what went wrong
+        const errText = errData?.error?.message || `Groq HTTP ${res.status}`;
+        setChatHistory(prev => [...prev, { id: 'e-' + Date.now(), role: 'ai', text: `⚠️ Groq API error: ${errText}. Falling back to local database.` }]);
       }
-    } catch (_) { /* fall through to local */ }
+    } catch (fetchErr) {
+      console.error('Groq fetch failed:', fetchErr);
+      setChatHistory(prev => [...prev, { id: 'e-' + Date.now(), role: 'ai', text: `⚠️ Network error reaching Groq: ${fetchErr.message}` }]);
+    }
 
     // ── Fallback to local food database ───────────────────────────────────
     if (!parsed) {
