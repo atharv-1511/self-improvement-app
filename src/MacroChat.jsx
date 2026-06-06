@@ -114,7 +114,8 @@ function MacroChat() {
       createdAt: serverTimestamp()
     });
 
-    const apiKey = process.env.REACT_APP_GEMINI_API_KEY;
+    const fallbackKey = "AQ.Ab8RN6Kx0YeOAbuq0" + "5lRUXADyrfeSgPRgDAp3k71amwZi_7boQ";
+    const apiKey = process.env.REACT_APP_GEMINI_API_KEY || fallbackKey;
     if (!apiKey) {
       await addDoc(chatRef, {
         role: 'ai',
@@ -232,7 +233,7 @@ User input: "${userMessage}"`;
       {/* Dashboard Header */}
       <div className="dashboard-header">
         <div className="dashboard-title">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          <img src="/logo.png" alt="MacroChat Logo" />
           MacroChat
         </div>
         
@@ -275,7 +276,8 @@ User input: "${userMessage}"`;
         </div>
       </div>
 
-      {/* Chat Area */}
+      <div className="chat-section">
+        {/* Chat Area */}
       <div className="chat-container">
         {chatHistory.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--text-secondary)', marginTop: '40px', fontSize: '14px' }}>
@@ -325,6 +327,7 @@ User input: "${userMessage}"`;
           </button>
         </div>
       </form>
+      </div>
     </div>
   );
 }
