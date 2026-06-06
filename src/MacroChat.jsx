@@ -18,7 +18,7 @@ function MacroChat() {
   const [loading, setLoading] = useState(true);
   const [showConfigForm, setShowConfigForm] = useState(false);
   const [configInput, setConfigInput] = useState('');
-  
+  const [geminiKeyInput, setGeminiKeyInput] = useState('');
   
   const [input, setInput] = useState('');
   const [chatHistory, setChatHistory] = useState([]);
@@ -26,7 +26,9 @@ function MacroChat() {
   const [isTyping, setIsTyping] = useState(false);
   const chatEndRef = useRef(null);
 
-  const today = new Date().toISOString().split('T')[0];
+  // Day-wise state
+  const [currentDate, setCurrentDate] = useState(new Date().toISOString().split('T')[0]);
+  const [dbReady, setDbReady] = useState(false);
 
   useEffect(() => {
     const initFirebase = async () => {
@@ -55,29 +57,40 @@ function MacroChat() {
 
       const userCred = await signInAnonymously(auth);
       currentUser = userCred.user;
-
-      // Subscribe to today's meals
-      const mealsRef = collection(db, 'users', currentUser.uid, 'dietLogs', today, 'meals');
-      onSnapshot(query(mealsRef, orderBy('createdAt', 'asc')), (snapshot) => {
-        const data = [];
-        snapshot.forEach((doc) => data.push({ id: doc.id, ...doc.data() }));
-        setMeals(data);
-      });
-
-      // Subscribe to today's chat
-      const chatRef = collection(db, 'users', currentUser.uid, 'dietLogs', today, 'chat');
-      onSnapshot(query(chatRef, orderBy('createdAt', 'asc')), (snapshot) => {
-        const data = [];
-        snapshot.forEach((doc) => data.push({ id: doc.id, ...doc.data() }));
-        setChatHistory(data);
-      });
-
+      
+      setDbReady(true);
       setLoading(false);
     } catch (error) {
       console.error('Setup error:', error);
       setLoading(false);
     }
   };
+
+  // Day-wise Subscription
+  useEffect(() => {
+    if (!db || !currentUser || !dbReady) return;
+
+    // Subscribe to current date meals
+    const mealsRef = collection(db, 'users', currentUser.uid, 'dietLogs', currentDate, 'meals');
+    const unsubMeals = onSnapshot(query(mealsRef, orderBy('createdAt', 'asc')), (snapshot) => {
+      const data = [];
+      snapshot.forEach((doc) => data.push({ id: doc.id, ...doc.data() }));
+      setMeals(data);
+    });
+
+    // Subscribe to current date chat
+    const chatRef = collection(db, 'users', currentUser.uid, 'dietLogs', currentDate, 'chat');
+    const unsubChat = onSnapshot(query(chatRef, orderBy('createdAt', 'asc')), (snapshot) => {
+      const data = [];
+      snapshot.forEach((doc) => data.push({ id: doc.id, ...doc.data() }));
+      setChatHistory(data);
+    });
+
+    return () => {
+      unsubMeals();
+      unsubChat();
+    };
+  }, [currentDate, dbReady]);
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -92,11 +105,20 @@ function MacroChat() {
     try {
       const config = JSON.parse(configInput);
       localStorage.setItem('firebaseConfig', JSON.stringify(config));
+      if (geminiKeyInput.trim()) {
+        localStorage.setItem('geminiApiKey', geminiKeyInput.trim());
+      }
       setShowConfigForm(false);
       setupFirebase(config);
     } catch (error) {
       alert('Invalid Firebase config JSON.');
     }
+  };
+
+  const changeDate = (offset) => {
+    const d = new Date(currentDate);
+    d.setDate(d.getDate() + offset);
+    setCurrentDate(d.toISOString().split('T')[0]);
   };
 
   const handleSend = async (e) => {
@@ -107,20 +129,22 @@ function MacroChat() {
     setInput('');
     setIsTyping(true);
 
-    const chatRef = collection(db, 'users', currentUser.uid, 'dietLogs', today, 'chat');
+    const chatRef = collection(db, 'users', currentUser.uid, 'dietLogs', currentDate, 'chat');
     await addDoc(chatRef, {
       role: 'user',
       text: userMessage,
       createdAt: serverTimestamp()
     });
 
+    const storedKey = localStorage.getItem('geminiApiKey');
     // eslint-disable-next-line no-useless-concat
     const fallbackKey = "AQ.Ab8RN6Kx0YeOAbuq0" + "5lRUXADyrfeSgPRgDAp3k71amwZi_7boQ";
-    const apiKey = process.env.REACT_APP_GEMINI_API_KEY || fallbackKey;
+    const apiKey = storedKey || process.env.REACT_APP_GEMINI_API_KEY || fallbackKey;
+    
     if (!apiKey) {
       await addDoc(chatRef, {
         role: 'ai',
-        text: 'ERR: REACT_APP_GEMINI_API_KEY missing.',
+        text: 'ERR: Gemini API Key missing.',
         createdAt: serverTimestamp()
       });
       setIsTyping(false);
@@ -158,19 +182,19 @@ User input: "${userMessage}"`;
       const data = await res.json();
       let aiText = data.candidates[0].content.parts[0].text.trim();
       
-      // Clean up markdown formatting if Gemini still included it
-      if (aiText.startsWith('```json')) {
-        aiText = aiText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-      } else if (aiText.startsWith('```')) {
-        aiText = aiText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+      // Robust JSON Extraction
+      let jsonString = aiText;
+      const jsonMatch = aiText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        jsonString = jsonMatch[0];
       }
 
-      const parsed = JSON.parse(aiText);
+      const parsed = JSON.parse(jsonString);
 
       // Save Meal if calories > 0
       let mealId = null;
       if (parsed.calories > 0 || parsed.protein > 0 || parsed.carbs > 0 || parsed.fat > 0) {
-        const mealsRef = collection(db, 'users', currentUser.uid, 'dietLogs', today, 'meals');
+        const mealsRef = collection(db, 'users', currentUser.uid, 'dietLogs', currentDate, 'meals');
         const mealDoc = await addDoc(mealsRef, {
           foodName: parsed.foodName || 'Unknown Food',
           calories: parsed.calories || 0,
@@ -192,10 +216,10 @@ User input: "${userMessage}"`;
       });
 
     } catch (error) {
-      console.error(error);
+      console.error("AI Error:", error);
       await addDoc(chatRef, {
         role: 'ai',
-        text: "Sorry, I couldn't process that meal. Make sure to describe the food clearly.",
+        text: "Sorry, I couldn't calculate the macros for that. Make sure to describe the food clearly.",
         createdAt: serverTimestamp()
       });
     } finally {
@@ -214,16 +238,30 @@ User input: "${userMessage}"`;
   const carbProgress = Math.min((totalCarbs / DAILY_TARGETS.carbs) * 100, 100);
   const fatProgress = Math.min((totalFat / DAILY_TARGETS.fat) * 100, 100);
 
+  const isToday = currentDate === new Date().toISOString().split('T')[0];
+
   if (loading) return null;
 
   if (showConfigForm) {
     return (
       <div className="setup-container">
         <h1>MacroChat Setup</h1>
-        <p>Please enter your Firebase config JSON to begin tracking.</p>
+        <p>Please configure your app to begin tracking.</p>
         <form onSubmit={handleConfigSubmit}>
-          <textarea value={configInput} onChange={e => setConfigInput(e.target.value)} placeholder='{ "apiKey": "..." }' />
-          <button type="submit">CONNECT FIREBASE</button>
+          <textarea 
+            value={configInput} 
+            onChange={e => setConfigInput(e.target.value)} 
+            placeholder='Firebase Config JSON (e.g. { "apiKey": "..." })' 
+            required
+          />
+          <input 
+            type="text" 
+            value={geminiKeyInput} 
+            onChange={e => setGeminiKeyInput(e.target.value)} 
+            placeholder='Gemini API Key (Optional if hardcoded)' 
+            style={{ width: '100%', padding: '16px', border: '1px solid var(--border-color)', borderRadius: '16px', marginBottom: '20px', fontFamily: 'monospace' }}
+          />
+          <button type="submit">CONNECT SERVICES</button>
         </form>
       </div>
     );
@@ -236,6 +274,12 @@ User input: "${userMessage}"`;
         <div className="dashboard-title">
           <img src="/logo.png" alt="MacroChat Logo" />
           MacroChat
+        </div>
+
+        <div className="date-selector">
+          <button onClick={() => changeDate(-1)}>◀</button>
+          <span>{currentDate} {isToday && "(Today)"}</span>
+          <button onClick={() => changeDate(1)} disabled={isToday} style={{ opacity: isToday ? 0.3 : 1 }}>▶</button>
         </div>
         
         <div className="macros-grid">
@@ -282,7 +326,7 @@ User input: "${userMessage}"`;
       <div className="chat-container">
         {chatHistory.length === 0 && (
           <div style={{ textAlign: 'center', color: 'var(--text-secondary)', marginTop: '40px', fontSize: '14px' }}>
-            No meals logged yet today. <br/> Try saying "I had 2 eggs and toast for breakfast."
+            No meals logged for {currentDate}. <br/> Try saying "I had 2 eggs and toast for breakfast."
           </div>
         )}
         
