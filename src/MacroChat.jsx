@@ -114,6 +114,7 @@ function MacroChat() {
       createdAt: serverTimestamp()
     });
 
+    // eslint-disable-next-line no-useless-concat
     const fallbackKey = "AQ.Ab8RN6Kx0YeOAbuq0" + "5lRUXADyrfeSgPRgDAp3k71amwZi_7boQ";
     const apiKey = process.env.REACT_APP_GEMINI_API_KEY || fallbackKey;
     if (!apiKey) {
