@@ -177,6 +177,11 @@ export default function MacroChat() {
   const [isTyping,      setIsTyping]      = useState(false);
   const [dbReady,       setDbReady]       = useState(false);
 
+  const [syncCode,      setSyncCode]      = useState(() => localStorage.getItem('syncCode') || '');
+  const [showSyncForm,  setShowSyncForm]  = useState(false);
+  const [customSyncInput, setCustomSyncInput] = useState('');
+  const [copied,        setCopied]        = useState(false);
+
   const chatEndRef = useRef(null);
 
   // ── Init ──────────────────────────────────────────────────────────────────
@@ -194,6 +199,13 @@ export default function MacroChat() {
       _db        = getFirestore(app);
       const cred = await signInAnonymously(_auth);
       _user      = cred.user;
+
+      let activeCode = localStorage.getItem('syncCode');
+      if (!activeCode) {
+        activeCode = cred.user.uid;
+        localStorage.setItem('syncCode', activeCode);
+      }
+      setSyncCode(activeCode);
       setDbReady(true);
     } catch (err) {
       console.error('Firebase init failed:', err);
@@ -204,17 +216,26 @@ export default function MacroChat() {
 
   // ── Day-wise Firestore listeners ──────────────────────────────────────────
   useEffect(() => {
-    if (!_db || !_user || !dbReady) return;
-    const mealsRef = collection(_db, 'users', _user.uid, 'dietLogs', currentDate, 'meals');
-    const chatRef  = collection(_db, 'users', _user.uid, 'dietLogs', currentDate, 'chat');
+    if (!_db || !syncCode || !dbReady) return;
+    const mealsRef = collection(_db, 'users', syncCode, 'dietLogs', currentDate, 'meals');
+    const chatRef  = collection(_db, 'users', syncCode, 'dietLogs', currentDate, 'chat');
+
+    // Clear local state before registering new listeners to avoid flashes of old data
+    setMeals([]);
+    setChatHistory([]);
+
     const unsubMeals = onSnapshot(query(mealsRef, orderBy('createdAt', 'asc')), (snap) => {
       setMeals(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      console.error('Meals subscription error:', err);
     });
     const unsubChat = onSnapshot(query(chatRef, orderBy('createdAt', 'asc')), (snap) => {
       setChatHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }, (err) => {
+      console.error('Chat history subscription error:', err);
     });
     return () => { unsubMeals(); unsubChat(); };
-  }, [currentDate, dbReady]);
+  }, [currentDate, syncCode, dbReady]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -352,15 +373,31 @@ User logged: "${msg}"`;
     if (savedMeal) setMeals(prev => [...prev, { id: tempAiId, ...savedMeal }]);
 
     // Persist to Firestore (all dates stored, never deleted)
-    if (_db && _user) {
-      const chatRef  = collection(_db, 'users', _user.uid, 'dietLogs', currentDate, 'chat');
-      const mealsRef = collection(_db, 'users', _user.uid, 'dietLogs', currentDate, 'meals');
+    if (_db && syncCode) {
+      const chatRef  = collection(_db, 'users', syncCode, 'dietLogs', currentDate, 'chat');
+      const mealsRef = collection(_db, 'users', syncCode, 'dietLogs', currentDate, 'meals');
       addDoc(chatRef, { role: 'user', text: msg, createdAt: serverTimestamp() }).catch(console.error);
       addDoc(chatRef, { role: 'ai', text: aiReplyText, mealData: savedMeal, createdAt: serverTimestamp() }).catch(console.error);
       if (savedMeal) addDoc(mealsRef, { ...savedMeal, createdAt: serverTimestamp() }).catch(console.error);
     }
 
     setIsTyping(false);
+  };
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(syncCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleSyncSubmit = (e) => {
+    e.preventDefault();
+    const newCode = customSyncInput.trim();
+    if (!newCode) return;
+    localStorage.setItem('syncCode', newCode);
+    setSyncCode(newCode);
+    setCustomSyncInput('');
+    setShowSyncForm(false);
   };
 
   // ── Totals ────────────────────────────────────────────────────────────────
@@ -440,6 +477,49 @@ User logged: "${msg}"`;
               <div className="macro-target">/ {TARGETS[key]}{unit}</div>
             </div>
           ))}
+        </div>
+
+        {/* Device Sync Panel */}
+        <div className="sync-card">
+          <div className="sync-card-header">
+            <span>Device Sync</span>
+            {copied && <span className="sync-copied-tooltip">Copied!</span>}
+          </div>
+          <div className="sync-code-wrapper">
+            <span className="sync-code-text" title={syncCode}>
+              {syncCode}
+            </span>
+            <button className="sync-btn-icon" onClick={handleCopyCode} title="Copy Sync Code">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            </button>
+          </div>
+          {!showSyncForm ? (
+            <button className="sync-toggle-btn" onClick={() => setShowSyncForm(true)}>
+              🔗 Sync Code Settings
+            </button>
+          ) : (
+            <form onSubmit={handleSyncSubmit} className="sync-form">
+              <input
+                type="text"
+                className="sync-input"
+                placeholder="Enter custom Sync Code"
+                value={customSyncInput}
+                onChange={(e) => setCustomSyncInput(e.target.value)}
+                required
+              />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button type="submit" className="sync-submit-btn" style={{ flex: 1 }}>
+                  Connect
+                </button>
+                <button type="button" className="sync-toggle-btn" style={{ flex: 1, marginTop: 0 }} onClick={() => setShowSyncForm(false)}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
 

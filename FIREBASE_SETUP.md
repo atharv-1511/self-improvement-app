@@ -57,8 +57,14 @@ const firebaseConfig = {
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Habits path (strict owner-only access)
     match /users/{userId}/habits/{document=**} {
       allow read, write: if request.auth.uid == userId;
+    }
+    
+    // Diet logs path (allows cross-device sync via shared Sync Code)
+    match /users/{userId}/dietLogs/{document=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }
@@ -66,7 +72,7 @@ service cloud.firestore {
 
 3. Click **Publish**
 
-This ensures only the user can access their own data (using anonymous auth).
+This ensures only authenticated users can access the database, and enables cross-device sync for your diet tracker by matching the Sync Code.
 
 ## Step 6: Run the App
 
