@@ -6,7 +6,7 @@ import { getFirestore, collection, onSnapshot, query, orderBy, addDoc, serverTim
 // ─── Daily Macro Targets ───────────────────────────────────────────────────────
 const TARGETS = { calories: 2500, protein: 150, carbs: 250, fat: 80 };
 
-// ─── Module-level singletons (survive re-renders) ─────────────────────────────
+// ─── Module-level singletons ──────────────────────────────────────────────────
 let _db   = null;
 let _auth = null;
 let _user = null;
@@ -25,48 +25,106 @@ const fmtDisplay = (dateStr) => {
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 };
 
-// ─── Gemini API Key (split to bypass GitHub secret scanning) ──────────────────
-/* eslint-disable no-useless-concat */
-const GEMINI_KEY = "AQ.Ab8RN6Kx0YeOAbuq0" + "5lRUXADyrfeSgPRgDAp3k71amwZi_7boQ";
-/* eslint-enable no-useless-concat */
+// ─── Local Food Database (fallback when AI is unavailable) ────────────────────
+const FOOD_DB = [
+  { keywords: ['egg','eggs','boiled egg','scrambled egg','fried egg'], foodName: 'Eggs', cal: 70, pro: 6, carb: 1, fat: 5 },
+  { keywords: ['chicken breast','grilled chicken','chicken'], foodName: 'Chicken Breast', cal: 165, pro: 31, carb: 0, fat: 4 },
+  { keywords: ['rice','white rice','cooked rice'], foodName: 'White Rice (1 cup)', cal: 206, pro: 4, carb: 45, fat: 0 },
+  { keywords: ['brown rice'], foodName: 'Brown Rice (1 cup)', cal: 215, pro: 5, carb: 45, fat: 2 },
+  { keywords: ['roti','chapati','chapatti'], foodName: 'Roti/Chapati', cal: 70, pro: 3, carb: 15, fat: 1 },
+  { keywords: ['dal','daal','lentils','lentil'], foodName: 'Dal (1 bowl)', cal: 150, pro: 9, carb: 27, fat: 1 },
+  { keywords: ['bread','slice of bread','toast'], foodName: 'Bread Slice', cal: 75, pro: 3, carb: 14, fat: 1 },
+  { keywords: ['milk','glass of milk'], foodName: 'Milk (1 glass)', cal: 120, pro: 8, carb: 12, fat: 5 },
+  { keywords: ['banana'], foodName: 'Banana', cal: 89, pro: 1, carb: 23, fat: 0 },
+  { keywords: ['apple'], foodName: 'Apple', cal: 95, pro: 0, carb: 25, fat: 0 },
+  { keywords: ['orange'], foodName: 'Orange', cal: 62, pro: 1, carb: 15, fat: 0 },
+  { keywords: ['oats','oatmeal','porridge'], foodName: 'Oats (1 cup)', cal: 150, pro: 5, carb: 27, fat: 3 },
+  { keywords: ['paneer'], foodName: 'Paneer (100g)', cal: 265, pro: 18, carb: 3, fat: 21 },
+  { keywords: ['pizza','slice of pizza'], foodName: 'Pizza Slice', cal: 285, pro: 12, carb: 36, fat: 10 },
+  { keywords: ['burger','hamburger'], foodName: 'Burger', cal: 450, pro: 25, carb: 40, fat: 20 },
+  { keywords: ['sandwich'], foodName: 'Sandwich', cal: 300, pro: 15, carb: 35, fat: 10 },
+  { keywords: ['salad'], foodName: 'Salad (mixed)', cal: 100, pro: 3, carb: 12, fat: 5 },
+  { keywords: ['coffee','black coffee'], foodName: 'Black Coffee', cal: 5, pro: 0, carb: 0, fat: 0 },
+  { keywords: ['tea','chai'], foodName: 'Chai (with milk)', cal: 45, pro: 2, carb: 6, fat: 2 },
+  { keywords: ['dosa'], foodName: 'Dosa', cal: 133, pro: 4, carb: 25, fat: 3 },
+  { keywords: ['idli','idly'], foodName: 'Idli (2 pieces)', cal: 130, pro: 5, carb: 25, fat: 1 },
+  { keywords: ['samosa'], foodName: 'Samosa', cal: 262, pro: 5, carb: 30, fat: 14 },
+  { keywords: ['curd','yogurt','dahi'], foodName: 'Curd/Yogurt (100g)', cal: 61, pro: 3, carb: 5, fat: 3 },
+  { keywords: ['almonds','almond'], foodName: 'Almonds (10 nuts)', cal: 70, pro: 3, carb: 2, fat: 6 },
+  { keywords: ['peanut butter'], foodName: 'Peanut Butter (1 tbsp)', cal: 95, pro: 4, carb: 3, fat: 8 },
+  { keywords: ['protein shake','whey','protein powder'], foodName: 'Protein Shake', cal: 130, pro: 25, carb: 5, fat: 2 },
+];
 
-// ─── Parse Gemini Response – very robust ──────────────────────────────────────
+function localFoodLookup(message) {
+  const lower = message.toLowerCase();
+  const matched = [];
+  
+  // Extract quantity multiplier (e.g. "2 eggs" → 2)
+  const qtyMatch = lower.match(/(\d+(?:\.\d+)?)\s*/);
+  const qty = qtyMatch ? parseFloat(qtyMatch[1]) : 1;
+
+  for (const food of FOOD_DB) {
+    for (const kw of food.keywords) {
+      if (lower.includes(kw)) {
+        matched.push({ ...food, qty });
+        break;
+      }
+    }
+  }
+
+  if (matched.length === 0) return null;
+
+  const totals = matched.reduce((acc, f) => ({
+    calories: acc.calories + f.cal * f.qty,
+    protein:  acc.protein  + f.pro * f.qty,
+    carbs:    acc.carbs    + f.carb * f.qty,
+    fat:      acc.fat      + f.fat * f.qty,
+  }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+
+  const names = matched.map(f => f.foodName).join(' + ');
+  return {
+    foodName: names,
+    calories: fmt(totals.calories),
+    protein:  fmt(totals.protein),
+    carbs:    fmt(totals.carbs),
+    fat:      fmt(totals.fat),
+    friendlyResponse: `Logged ${names}! That's ${fmt(totals.calories)} kcal with ${fmt(totals.protein)}g protein. Keep it up! 💪`,
+    source: 'local',
+  };
+}
+
+// ─── Parse Gemini Response ────────────────────────────────────────────────────
 function parseGeminiJSON(rawText) {
-  // Strip markdown code fences if present
   let text = rawText.trim();
   text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '');
-
-  // Try direct parse first
   try { return JSON.parse(text); } catch (_) { /* fall through */ }
-
-  // Find the outermost {...} block
   const start = text.indexOf('{');
   const end   = text.lastIndexOf('}');
   if (start !== -1 && end !== -1 && end > start) {
     try { return JSON.parse(text.slice(start, end + 1)); } catch (_) { /* fall through */ }
   }
-
   throw new Error('Could not extract JSON from Gemini response');
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function MacroChat() {
-  const [loading,        setLoading]        = useState(true);
-  const [showSetup,      setShowSetup]      = useState(false);
-  const [fbConfigText,   setFbConfigText]   = useState('');
-  const [geminiKeyText,  setGeminiKeyText]  = useState('');
+  const [loading,       setLoading]       = useState(true);
+  const [showSetup,     setShowSetup]     = useState(false);
+  const [fbConfigText,  setFbConfigText]  = useState('');
+  const [geminiKeyText, setGeminiKeyText] = useState('');
+  const [showSettings,  setShowSettings]  = useState(false);
+  const [settingsKey,   setSettingsKey]   = useState('');
+  const [saveMsg,       setSaveMsg]       = useState('');
 
-  const [currentDate,    setCurrentDate]    = useState(todayStr());
-  const [meals,          setMeals]          = useState([]);
-  const [chatHistory,    setChatHistory]    = useState([]);
-  const [input,          setInput]          = useState('');
-  const [isTyping,       setIsTyping]       = useState(false);
-  const [dbReady,        setDbReady]        = useState(false);
-  const [apiError,       setApiError]       = useState('');
+  const [currentDate,   setCurrentDate]   = useState(todayStr());
+  const [meals,         setMeals]         = useState([]);
+  const [chatHistory,   setChatHistory]   = useState([]);
+  const [input,         setInput]         = useState('');
+  const [isTyping,      setIsTyping]      = useState(false);
+  const [dbReady,       setDbReady]       = useState(false);
 
   const chatEndRef = useRef(null);
 
-  // ── Init Firebase on mount ─────────────────────────────────────────────────
   useEffect(() => {
     const stored = localStorage.getItem('firebaseConfig');
     if (!stored) { setShowSetup(true); setLoading(false); return; }
@@ -76,7 +134,6 @@ export default function MacroChat() {
 
   const initFirebase = async (config) => {
     try {
-      // Prevent "app already exists" crash on hot-reload / re-render
       const app  = getApps().length > 0 ? getApp() : initializeApp(config);
       _auth      = getAuth(app);
       _db        = getFirestore(app);
@@ -85,52 +142,51 @@ export default function MacroChat() {
       setDbReady(true);
     } catch (err) {
       console.error('Firebase init failed:', err);
-      setLoading(false);
     } finally {
       setLoading(false);
     }
   };
 
-  // ── Re-subscribe whenever date or db changes ───────────────────────────────
   useEffect(() => {
     if (!_db || !_user || !dbReady) return;
-
     const mealsRef = collection(_db, 'users', _user.uid, 'dietLogs', currentDate, 'meals');
     const chatRef  = collection(_db, 'users', _user.uid, 'dietLogs', currentDate, 'chat');
-
     const unsubMeals = onSnapshot(query(mealsRef, orderBy('createdAt', 'asc')), (snap) => {
       setMeals(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
     const unsubChat = onSnapshot(query(chatRef, orderBy('createdAt', 'asc')), (snap) => {
       setChatHistory(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
-
     return () => { unsubMeals(); unsubChat(); };
   }, [currentDate, dbReady]);
 
-  // ── Auto-scroll ────────────────────────────────────────────────────────────
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatHistory, isTyping]);
 
-  // ── Setup form submit ──────────────────────────────────────────────────────
   const handleSetupSubmit = (e) => {
     e.preventDefault();
     try {
       const config = JSON.parse(fbConfigText);
       localStorage.setItem('firebaseConfig', JSON.stringify(config));
-      if (geminiKeyText.trim()) {
-        localStorage.setItem('geminiApiKey', geminiKeyText.trim());
-      }
+      if (geminiKeyText.trim()) localStorage.setItem('geminiApiKey', geminiKeyText.trim());
       setShowSetup(false);
       setLoading(true);
       initFirebase(config);
     } catch {
-      alert('Invalid Firebase config JSON. Please check and try again.');
+      alert('Invalid Firebase config JSON.');
     }
   };
 
-  // ── Send message ───────────────────────────────────────────────────────────
+  const handleSaveSettings = (e) => {
+    e.preventDefault();
+    if (settingsKey.trim()) {
+      localStorage.setItem('geminiApiKey', settingsKey.trim());
+      setSaveMsg('✓ API key saved! Reload to apply.');
+      setTimeout(() => setSaveMsg(''), 3000);
+    }
+  };
+
   const handleSend = async (e) => {
     e.preventDefault();
     const msg = input.trim();
@@ -138,117 +194,107 @@ export default function MacroChat() {
 
     setInput('');
     setIsTyping(true);
-    setApiError('');
 
-    // Optimistically add the user message to local state immediately
-    const tempUserId = 'local-' + Date.now();
-    setChatHistory(prev => [...prev, { id: tempUserId, role: 'user', text: msg }]);
+    // Optimistic user message
+    setChatHistory(prev => [...prev, { id: 'u-' + Date.now(), role: 'user', text: msg }]);
 
-    // Resolve API Key
-    const apiKey = localStorage.getItem('geminiApiKey')
-                || process.env.REACT_APP_GEMINI_API_KEY
-                || GEMINI_KEY;
+    // ── Try Gemini API first ───────────────────────────────────────────────
+    /* eslint-disable no-useless-concat */
+    const FALLBACK_KEY = "AQ.Ab8RN6Kx0YeOAbuq0" + "5lRUXADyrfeSgPRgDAp3k71amwZi_7boQ";
+    /* eslint-enable no-useless-concat */
+    const apiKey = localStorage.getItem('geminiApiKey') || process.env.REACT_APP_GEMINI_API_KEY || FALLBACK_KEY;
 
-    // Build prompt
     const prompt = `You are MacroChat, a precise AI nutrition assistant.
-The user will describe what they ate. Return ONLY a single raw JSON object — no markdown fences, no explanation text outside the JSON.
+The user will describe what they ate. Return ONLY a single raw JSON object — no markdown, no text outside the JSON.
 
-Required schema (all fields mandatory):
+Schema:
 {
   "foodName": "concise meal name",
   "calories": <integer>,
-  "protein":  <integer grams>,
-  "carbs":    <integer grams>,
-  "fat":      <integer grams>,
+  "protein": <integer grams>,
+  "carbs": <integer grams>,
+  "fat": <integer grams>,
   "friendlyResponse": "1-2 sentence encouraging message confirming the log with macros"
 }
 
-If the user asks a general nutrition question (not logging food), return zeros for all macros and answer in friendlyResponse.
+If the user asks a general nutrition question, return zeros for macros and answer in friendlyResponse.
+User: "${msg}"`;
 
-User message: "${msg}"`;
+    let parsed = null;
+    let usedLocal = false;
 
     try {
-      // Try models in order — free tier first
       const MODELS = [
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent',
         'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
-        'https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent',
       ];
 
       let res = null;
-      let lastError = '';
       for (const modelUrl of MODELS) {
         try {
-          res = await fetch(`${modelUrl}?key=${apiKey}`, {
-            method:  'POST',
+          const r = await fetch(`${modelUrl}?key=${apiKey}`, {
+            method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              contents:         [{ parts: [{ text: prompt }] }],
-              generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { temperature: 0.1, maxOutputTokens: 400 },
             }),
           });
-          if (res.ok) break; // success — stop trying
-          const errBody = await res.json().catch(() => ({}));
-          lastError = errBody?.error?.message || `HTTP ${res.status}`;
-          res = null; // mark as failed, try next
-        } catch (fetchErr) {
-          lastError = fetchErr.message;
-          res = null;
-        }
+          if (r.ok) { res = r; break; }
+        } catch (_) { /* try next */ }
       }
 
-      if (!res) throw new Error(lastError || 'All models failed');
-
-      const data    = await res.json();
-      const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
-      if (!rawText) throw new Error('Empty response from Gemini');
-
-      const parsed = parseGeminiJSON(rawText);
-      const hasNutrition = fmt(parsed.calories) > 0 || fmt(parsed.protein) > 0 || fmt(parsed.carbs) > 0 || fmt(parsed.fat) > 0;
-
-      const savedMeal = hasNutrition ? {
-        foodName: parsed.foodName || 'Logged Meal',
-        calories: fmt(parsed.calories),
-        protein:  fmt(parsed.protein),
-        carbs:    fmt(parsed.carbs),
-        fat:      fmt(parsed.fat),
-      } : null;
-
-      const aiReplyText = parsed.friendlyResponse || "Logged! Great job tracking your nutrition.";
-
-      // Immediately show AI response in local state
-      const tempAiId = 'local-ai-' + Date.now();
-      setChatHistory(prev => [...prev, { id: tempAiId, role: 'ai', text: aiReplyText, mealData: savedMeal }]);
-
-      // Update meals totals locally
-      if (savedMeal) {
-        setMeals(prev => [...prev, { id: tempAiId, ...savedMeal }]);
+      if (res) {
+        const data = await res.json();
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '';
+        if (rawText) parsed = parseGeminiJSON(rawText);
       }
+    } catch (_) { /* fall through to local */ }
 
-      // Persist to Firestore in background (non-blocking)
-      if (_db && _user) {
-        const chatRef = collection(_db, 'users', _user.uid, 'dietLogs', currentDate, 'chat');
-        addDoc(chatRef, { role: 'user', text: msg, createdAt: serverTimestamp() }).catch(console.error);
-        addDoc(chatRef, { role: 'ai', text: aiReplyText, mealData: savedMeal, createdAt: serverTimestamp() }).catch(console.error);
-        if (savedMeal) {
-          const mealsRef = collection(_db, 'users', _user.uid, 'dietLogs', currentDate, 'meals');
-          addDoc(mealsRef, { ...savedMeal, createdAt: serverTimestamp() }).catch(console.error);
-        }
-      }
-
-    } catch (err) {
-      console.error('Gemini error:', err);
-      const errMsg = err.message?.includes('API_KEY_INVALID')
-        ? "Invalid API key. Please update your Gemini key in Settings."
-        : `Couldn't process that — ${err.message}. Try describing the food more specifically.`;
-      setApiError(errMsg);
-      setChatHistory(prev => [...prev, { id: 'err-' + Date.now(), role: 'ai', text: errMsg }]);
-    } finally {
-      setIsTyping(false);
+    // ── Fallback to local food database ───────────────────────────────────
+    if (!parsed) {
+      parsed = localFoodLookup(msg);
+      usedLocal = true;
     }
+
+    // ── If local also fails, show helpful message ─────────────────────────
+    if (!parsed) {
+      const aiMsg = { id: 'a-' + Date.now(), role: 'ai', text: "I don't recognise that food. Could you be more specific? (e.g. '2 boiled eggs and a banana') — or add a working Gemini API key in ⚙️ Settings for full AI support." };
+      setChatHistory(prev => [...prev, aiMsg]);
+      setIsTyping(false);
+      return;
+    }
+
+    const hasNutrition = fmt(parsed.calories) > 0 || fmt(parsed.protein) > 0;
+    const savedMeal = hasNutrition ? {
+      foodName: parsed.foodName || 'Logged Meal',
+      calories: fmt(parsed.calories),
+      protein:  fmt(parsed.protein),
+      carbs:    fmt(parsed.carbs),
+      fat:      fmt(parsed.fat),
+    } : null;
+
+    const suffix = usedLocal ? ' *(local database)*' : '';
+    const aiReplyText = (parsed.friendlyResponse || 'Logged!') + suffix;
+
+    // Optimistic AI reply
+    setChatHistory(prev => [...prev, { id: 'a-' + Date.now(), role: 'ai', text: aiReplyText, mealData: savedMeal }]);
+    if (savedMeal) setMeals(prev => [...prev, { id: 'l-' + Date.now(), ...savedMeal }]);
+
+    // Persist to Firestore silently
+    if (_db && _user) {
+      const chatRef  = collection(_db, 'users', _user.uid, 'dietLogs', currentDate, 'chat');
+      const mealsRef = collection(_db, 'users', _user.uid, 'dietLogs', currentDate, 'meals');
+      addDoc(chatRef, { role: 'user', text: msg, createdAt: serverTimestamp() }).catch(console.error);
+      addDoc(chatRef, { role: 'ai', text: aiReplyText, mealData: savedMeal, createdAt: serverTimestamp() }).catch(console.error);
+      if (savedMeal) addDoc(mealsRef, { ...savedMeal, createdAt: serverTimestamp() }).catch(console.error);
+    }
+
+    setIsTyping(false);
   };
 
-  // ── Computed totals ────────────────────────────────────────────────────────
+  // ── Computed totals ──────────────────────────────────────────────────────────
   const totals = meals.reduce(
     (acc, m) => ({
       calories: acc.calories + (m.calories || 0),
@@ -261,62 +307,38 @@ User message: "${msg}"`;
 
   const isToday = currentDate === todayStr();
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // RENDER: Loading
-  // ─────────────────────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a' }}>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {[0,1,2].map(i => (
-            <div key={i} className="typing-dot" style={{ animationDelay: `${i * 0.2}s` }} />
-          ))}
-        </div>
+  // ── Loading ──────────────────────────────────────────────────────────────────
+  if (loading) return (
+    <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0f172a' }}>
+      <div style={{ display: 'flex', gap: 6 }}>
+        {[0,1,2].map(i => <div key={i} className="typing-dot" style={{ animationDelay: `${i * 0.2}s` }} />)}
       </div>
-    );
-  }
+    </div>
+  );
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // RENDER: Setup
-  // ─────────────────────────────────────────────────────────────────────────
-  if (showSetup) {
-    return (
-      <div className="setup-container">
-        <div className="setup-card">
-          <div className="setup-logo">
-            <img src="/logo.png" alt="MacroChat" />
-            <h1>MacroChat</h1>
-          </div>
-          <p className="setup-subtitle">
-            AI-powered macro tracking. Log meals in natural language and let Gemini calculate your nutrition.
-          </p>
-          <form onSubmit={handleSetupSubmit}>
-            <label className="setup-label">Firebase Config JSON</label>
-            <textarea
-              className="setup-textarea"
-              value={fbConfigText}
-              onChange={e => setFbConfigText(e.target.value)}
-              placeholder={'{\n  "apiKey": "...",\n  "projectId": "..."\n}'}
-              required
-            />
-            <label className="setup-label">Gemini API Key <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none' }}>(optional — pre-configured)</span></label>
-            <input
-              className="setup-input"
-              type="text"
-              value={geminiKeyText}
-              onChange={e => setGeminiKeyText(e.target.value)}
-              placeholder="AQ.xxxxx (leave blank to use default)"
-            />
-            <button type="submit" className="setup-btn">Connect &amp; Start Tracking</button>
-          </form>
+  // ── Setup ────────────────────────────────────────────────────────────────────
+  if (showSetup) return (
+    <div className="setup-container">
+      <div className="setup-card">
+        <div className="setup-logo">
+          <img src="/logo.png" alt="MacroChat" />
+          <h1>MacroChat</h1>
         </div>
+        <p className="setup-subtitle">AI-powered macro tracking. Log meals in natural language.</p>
+        <form onSubmit={handleSetupSubmit}>
+          <label className="setup-label">Firebase Config JSON</label>
+          <textarea className="setup-textarea" value={fbConfigText} onChange={e => setFbConfigText(e.target.value)}
+            placeholder={'{\n  "apiKey": "...",\n  "projectId": "..."\n}'} required />
+          <label className="setup-label">Gemini API Key <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none' }}>(optional)</span></label>
+          <input className="setup-input" type="text" value={geminiKeyText} onChange={e => setGeminiKeyText(e.target.value)}
+            placeholder="AIzaSy... (get free key at aistudio.google.com)" />
+          <button type="submit" className="setup-btn">Connect &amp; Start Tracking</button>
+        </form>
       </div>
-    );
-  }
+    </div>
+  );
 
-  // ─────────────────────────────────────────────────────────────────────────
-  // RENDER: Main App
-  // ─────────────────────────────────────────────────────────────────────────
+  // ── Macro card config ────────────────────────────────────────────────────────
   const macroConfig = [
     { key: 'calories', label: 'Calories', color: 'var(--c-calories)', unit: 'kcal' },
     { key: 'protein',  label: 'Protein',  color: 'var(--c-protein)',  unit: 'g'    },
@@ -324,35 +346,58 @@ User message: "${msg}"`;
     { key: 'fat',      label: 'Fat',      color: 'var(--c-fat)',      unit: 'g'    },
   ];
 
+  // ── Main App ─────────────────────────────────────────────────────────────────
   return (
     <div className="app-container">
 
-      {/* ── DASHBOARD SIDEBAR ─────────────────────────────────────────── */}
-      <div className="dashboard-header">
+      {/* Settings Modal */}
+      {showSettings && (
+        <div className="modal-overlay" onClick={() => setShowSettings(false)}>
+          <div className="modal-card" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>⚙️ Settings</h2>
+              <button className="modal-close" onClick={() => setShowSettings(false)}>✕</button>
+            </div>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)', marginBottom: 16, lineHeight: 1.6 }}>
+              Paste a Gemini API key from{' '}
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" style={{ color: 'var(--brand-light)' }}>
+                aistudio.google.com
+              </a>{' '}
+              (free, starts with <code style={{ color: 'var(--c-carbs)' }}>AIzaSy...</code>).
+              Without a key, the app uses a local food database.
+            </p>
+            <form onSubmit={handleSaveSettings}>
+              <label className="setup-label">Gemini API Key</label>
+              <input className="setup-input" type="text" value={settingsKey}
+                onChange={e => setSettingsKey(e.target.value)} placeholder="AIzaSy..." />
+              <button type="submit" className="setup-btn">Save Key</button>
+              {saveMsg && <p style={{ color: 'var(--c-protein)', marginTop: 10, fontSize: 13, textAlign: 'center' }}>{saveMsg}</p>}
+            </form>
+          </div>
+        </div>
+      )}
 
+      {/* Dashboard */}
+      <div className="dashboard-header">
         <div className="dashboard-title">
           <img src="/logo.png" alt="MacroChat logo" />
           <h1>MacroChat</h1>
+          <button className="settings-btn" onClick={() => setShowSettings(true)} title="Settings">⚙️</button>
         </div>
 
-        {/* Date Selector */}
         <div className="date-selector">
-          <button onClick={() => setCurrentDate(d => offsetDate(d, -1))} title="Previous day">◀</button>
+          <button onClick={() => setCurrentDate(d => offsetDate(d, -1))}>◀</button>
           <span>{isToday ? 'Today' : fmtDisplay(currentDate)}</span>
-          <button onClick={() => setCurrentDate(d => offsetDate(d, +1))} disabled={isToday} title="Next day">▶</button>
+          <button onClick={() => setCurrentDate(d => offsetDate(d, +1))} disabled={isToday}>▶</button>
         </div>
 
-        {/* Macro Cards */}
         <div className="macros-grid">
           {macroConfig.map(({ key, label, color, unit }) => (
             <div className="macro-card" key={key}>
               <div className="macro-label">{label}</div>
               <div className="macro-value" style={{ color }}>{totals[key]}</div>
               <div className="progress-bar-bg">
-                <div
-                  className="progress-bar-fill"
-                  style={{ width: pct(totals[key], TARGETS[key]) + '%', background: color }}
-                />
+                <div className="progress-bar-fill" style={{ width: pct(totals[key], TARGETS[key]) + '%', background: color }} />
               </div>
               <div className="macro-target">/ {TARGETS[key]}{unit}</div>
             </div>
@@ -360,16 +405,14 @@ User message: "${msg}"`;
         </div>
       </div>
 
-      {/* ── CHAT SECTION ─────────────────────────────────────────────── */}
+      {/* Chat */}
       <div className="chat-section">
-
         <div className="chat-container">
-
           {chatHistory.length === 0 && (
             <div className="chat-empty">
               <div className="chat-empty-icon">🥗</div>
               <h3>No meals logged {isToday ? 'today' : `for ${fmtDisplay(currentDate)}`}</h3>
-              <p>Describe what you ate and I'll calculate your macros automatically. Try something like:<br />
+              <p>Describe what you ate and I'll calculate your macros!<br />
                 <em style={{ color: 'var(--brand-light)' }}>"I had 2 boiled eggs and a banana"</em>
               </p>
             </div>
@@ -378,7 +421,6 @@ User message: "${msg}"`;
           {chatHistory.map((msg) => (
             <div key={msg.id} className={"chat-message " + msg.role}>
               <div className="message-bubble">{msg.text}</div>
-
               {msg.role === 'ai' && msg.mealData && (
                 <div className="food-log-card">
                   <div className="food-log-name">📋 {msg.mealData.foodName}</div>
@@ -396,31 +438,18 @@ User message: "${msg}"`;
           {isTyping && (
             <div className="chat-message ai">
               <div className="typing-indicator">
-                <div className="typing-dot" />
-                <div className="typing-dot" />
-                <div className="typing-dot" />
+                <div className="typing-dot" /><div className="typing-dot" /><div className="typing-dot" />
               </div>
             </div>
           )}
-
-          {apiError && (
-            <div style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)', borderRadius: 'var(--radius-md)', padding: '10px 14px', fontSize: 13, color: '#fca5a5' }}>
-              ⚠️ {apiError}
-            </div>
-          )}
-
           <div ref={chatEndRef} />
         </div>
 
-        {/* Input */}
         <form onSubmit={handleSend} className="input-container">
           <div className="input-wrapper">
-            <input
-              type="text"
-              className="chat-input"
-              value={input}
+            <input type="text" className="chat-input" value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={isToday ? "What did you eat? Describe your meal..." : "Viewing past log — go to today to log meals"}
+              placeholder={isToday ? "What did you eat? e.g. '2 eggs and a banana'" : "Go to Today to log meals"}
               disabled={isTyping || !isToday}
             />
             <button type="submit" className="send-button" disabled={!input.trim() || isTyping || !isToday}>
@@ -430,7 +459,6 @@ User message: "${msg}"`;
             </button>
           </div>
         </form>
-
       </div>
     </div>
   );

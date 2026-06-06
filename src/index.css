@@ -450,7 +450,61 @@ body {
   30%            { transform: translateY(-6px); }
 }
 
-/* ===================== DESKTOP LAYOUT ===================== */
+/* ===================== SETTINGS BUTTON ===================== */
+.settings-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  margin-left: auto;
+  padding: 4px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+.settings-btn:hover { opacity: 1; }
+
+/* ===================== MODAL ===================== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+.modal-card {
+  width: 100%;
+  max-width: 420px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 28px;
+  box-shadow: var(--shadow-lg);
+  animation: slideIn 0.2s ease;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.modal-header h2 { font-size: 18px; font-weight: 700; }
+.modal-close {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s;
+}
+.modal-close:hover { background: var(--bg-hover); }
+
+/* ===================== DESKTOP RESPONSIVE LAYOUT ===================== */
 @media (min-width: 768px) {
   .app-container {
     max-width: 1080px;
