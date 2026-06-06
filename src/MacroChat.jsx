@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 import { getFirestore, collection, onSnapshot, query, orderBy, addDoc, serverTimestamp } from 'firebase/firestore';
 
@@ -76,7 +76,8 @@ export default function MacroChat() {
 
   const initFirebase = async (config) => {
     try {
-      const app  = initializeApp(config);
+      // Prevent "app already exists" crash on hot-reload / re-render
+      const app  = getApps().length > 0 ? getApp() : initializeApp(config);
       _auth      = getAuth(app);
       _db        = getFirestore(app);
       const cred = await signInAnonymously(_auth);
@@ -84,6 +85,7 @@ export default function MacroChat() {
       setDbReady(true);
     } catch (err) {
       console.error('Firebase init failed:', err);
+      setLoading(false);
     } finally {
       setLoading(false);
     }
@@ -132,23 +134,22 @@ export default function MacroChat() {
   const handleSend = async (e) => {
     e.preventDefault();
     const msg = input.trim();
-    if (!msg || !_db || isTyping) return;
+    if (!msg || isTyping) return;
 
     setInput('');
     setIsTyping(true);
     setApiError('');
 
-    const chatRef = collection(_db, 'users', _user.uid, 'dietLogs', currentDate, 'chat');
+    // Optimistically add the user message to local state immediately
+    const tempUserId = 'local-' + Date.now();
+    setChatHistory(prev => [...prev, { id: tempUserId, role: 'user', text: msg }]);
 
-    // 1. Save user message immediately
-    await addDoc(chatRef, { role: 'user', text: msg, createdAt: serverTimestamp() });
-
-    // 2. Resolve API Key
+    // Resolve API Key
     const apiKey = localStorage.getItem('geminiApiKey')
                 || process.env.REACT_APP_GEMINI_API_KEY
                 || GEMINI_KEY;
 
-    // 3. Build prompt
+    // Build prompt
     const prompt = `You are MacroChat, a precise AI nutrition assistant.
 The user will describe what they ate. Return ONLY a single raw JSON object — no markdown fences, no explanation text outside the JSON.
 
@@ -189,38 +190,37 @@ User message: "${msg}"`;
       if (!rawText) throw new Error('Empty response from Gemini');
 
       const parsed = parseGeminiJSON(rawText);
+      const hasNutrition = fmt(parsed.calories) > 0 || fmt(parsed.protein) > 0 || fmt(parsed.carbs) > 0 || fmt(parsed.fat) > 0;
 
-      // Validate required fields
-      const hasNutrition = parsed.calories > 0 || parsed.protein > 0 || parsed.carbs > 0 || parsed.fat > 0;
+      const savedMeal = hasNutrition ? {
+        foodName: parsed.foodName || 'Logged Meal',
+        calories: fmt(parsed.calories),
+        protein:  fmt(parsed.protein),
+        carbs:    fmt(parsed.carbs),
+        fat:      fmt(parsed.fat),
+      } : null;
 
-      // 4. Save meal if it has nutritional data
-      let savedMeal = null;
-      if (hasNutrition) {
-        const mealsRef = collection(_db, 'users', _user.uid, 'dietLogs', currentDate, 'meals');
-        await addDoc(mealsRef, {
-          foodName: parsed.foodName || 'Logged Meal',
-          calories: fmt(parsed.calories),
-          protein:  fmt(parsed.protein),
-          carbs:    fmt(parsed.carbs),
-          fat:      fmt(parsed.fat),
-          createdAt: serverTimestamp(),
-        });
-        savedMeal = {
-          foodName: parsed.foodName || 'Logged Meal',
-          calories: fmt(parsed.calories),
-          protein:  fmt(parsed.protein),
-          carbs:    fmt(parsed.carbs),
-          fat:      fmt(parsed.fat),
-        };
+      const aiReplyText = parsed.friendlyResponse || "Logged! Great job tracking your nutrition.";
+
+      // Immediately show AI response in local state
+      const tempAiId = 'local-ai-' + Date.now();
+      setChatHistory(prev => [...prev, { id: tempAiId, role: 'ai', text: aiReplyText, mealData: savedMeal }]);
+
+      // Update meals totals locally
+      if (savedMeal) {
+        setMeals(prev => [...prev, { id: tempAiId, ...savedMeal }]);
       }
 
-      // 5. Save AI reply
-      await addDoc(chatRef, {
-        role:     'ai',
-        text:     parsed.friendlyResponse || "Logged! Great job tracking your nutrition.",
-        mealData: savedMeal,
-        createdAt: serverTimestamp(),
-      });
+      // Persist to Firestore in background (non-blocking)
+      if (_db && _user) {
+        const chatRef = collection(_db, 'users', _user.uid, 'dietLogs', currentDate, 'chat');
+        addDoc(chatRef, { role: 'user', text: msg, createdAt: serverTimestamp() }).catch(console.error);
+        addDoc(chatRef, { role: 'ai', text: aiReplyText, mealData: savedMeal, createdAt: serverTimestamp() }).catch(console.error);
+        if (savedMeal) {
+          const mealsRef = collection(_db, 'users', _user.uid, 'dietLogs', currentDate, 'meals');
+          addDoc(mealsRef, { ...savedMeal, createdAt: serverTimestamp() }).catch(console.error);
+        }
+      }
 
     } catch (err) {
       console.error('Gemini error:', err);
@@ -228,7 +228,7 @@ User message: "${msg}"`;
         ? "Invalid API key. Please update your Gemini key in Settings."
         : `Couldn't process that — ${err.message}. Try describing the food more specifically.`;
       setApiError(errMsg);
-      await addDoc(chatRef, { role: 'ai', text: errMsg, createdAt: serverTimestamp() });
+      setChatHistory(prev => [...prev, { id: 'err-' + Date.now(), role: 'ai', text: errMsg }]);
     } finally {
       setIsTyping(false);
     }
